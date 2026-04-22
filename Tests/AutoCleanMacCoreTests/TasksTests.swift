@@ -78,4 +78,15 @@ final class TasksTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: logsRoot.appendingPathComponent("old.log").path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: logsRoot.appendingPathComponent("fresh.log").path))
     }
+
+    // MARK: - SystemTempTask
+
+    func test_system_temp_deletes_old_files_only() async throws {
+        let temp = tempDir.appendingPathComponent("temp-root")
+        try Fixtures.makeFile(at: temp.appendingPathComponent("old.tmp"),   size: 80, ageInDays: 30)
+        try Fixtures.makeFile(at: temp.appendingPathComponent("fresh.tmp"), size: 80, ageInDays: 1)
+        let task = SystemTempTask(isEnabled: true, rootOverride: temp)
+        let result = await task.run(context: makeContext())
+        XCTAssertEqual(result.bytesFreed, 80)
+    }
 }
