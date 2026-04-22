@@ -28,8 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = MenuBarController()
         menu.onRunNow         = { [weak self] in self?.runCleanup(source: "menu") }
         menu.onShowLastLog    = { [weak self] in self?.openMostRecentLog() }
-        menu.onOpenConfig     = { [weak self] in self?.openInDefaultEditor(self!.configPath) }
-        menu.onOpenLogsFolder = { [weak self] in NSWorkspace.shared.open(self!.logsDir) }
+        menu.onOpenConfig     = { [weak self] in guard let self else { return }; self.openInDefaultEditor(self.configPath) }
+        menu.onOpenLogsFolder = { [weak self] in guard let self else { return }; NSWorkspace.shared.open(self.logsDir) }
         menu.onQuit           = { NSApp.terminate(nil) }
         menu.install()
         menuBar = menu
@@ -53,7 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         Task {
             let summary = await engine.run(context: ctx) { event in
-                Task { @MainActor in self.handle(event, on: window.model) }
+                DispatchQueue.main.async { self.handle(event, on: window.model) }
             }
             await MainActor.run {
                 window.model.summary = Self.formatSummary(summary)

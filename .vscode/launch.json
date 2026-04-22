@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:__auto_clean_mac}",
+            "name": "Debug AutoCleanMac",
+            "target": "AutoCleanMac",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug AutoCleanMac"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:__auto_clean_mac}",
+            "name": "Release AutoCleanMac",
+            "target": "AutoCleanMac",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release AutoCleanMac"
+        }
+    ]
+}
