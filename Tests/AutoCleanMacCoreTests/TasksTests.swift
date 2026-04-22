@@ -89,4 +89,15 @@ final class TasksTests: XCTestCase {
         let result = await task.run(context: makeContext())
         XCTAssertEqual(result.bytesFreed, 80)
     }
+
+    // MARK: - UserCachesTask
+
+    func test_user_caches_deletes_all_files_regardless_of_mtime() async throws {
+        let caches = tempDir.appendingPathComponent("Library/Caches")
+        try Fixtures.makeFile(at: caches.appendingPathComponent("a/x.bin"),  size: 100, ageInDays: 0)
+        try Fixtures.makeFile(at: caches.appendingPathComponent("b/y.bin"),  size: 200, ageInDays: 30)
+        let task = UserCachesTask(isEnabled: true)
+        let result = await task.run(context: makeContext())
+        XCTAssertEqual(result.bytesFreed, 300)
+    }
 }
