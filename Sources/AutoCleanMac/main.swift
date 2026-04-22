@@ -1,3 +1,5 @@
 import AutoCleanMacCore
 
-print("AutoCleanMac \(AutoCleanMacCore.version) — scaffold build")
+// Temporary scaffold — will be replaced in Task 17 with AppDelegate-based app.
+_ = TaskResult()
+print("AutoCleanMac scaffold")
