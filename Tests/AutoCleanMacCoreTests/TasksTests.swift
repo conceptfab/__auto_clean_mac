@@ -50,4 +50,19 @@ final class TasksTests: XCTestCase {
         let result = await task.run(context: makeContext())
         XCTAssertTrue(result.skipped)
     }
+
+    // MARK: - DSStoreTask
+
+    func test_dsstore_deletes_only_dsstore_files() async throws {
+        let desktop = tempDir.appendingPathComponent("Desktop")
+        try Fixtures.makeFile(at: desktop.appendingPathComponent(".DS_Store"), size: 50)
+        try Fixtures.makeFile(at: desktop.appendingPathComponent("important.txt"), size: 500)
+        try Fixtures.makeFile(at: desktop.appendingPathComponent("sub/.DS_Store"), size: 70)
+        let task = DSStoreTask(isEnabled: true)
+        let result = await task.run(context: makeContext())
+        XCTAssertEqual(result.bytesFreed, 120)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: desktop.appendingPathComponent("important.txt").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: desktop.appendingPathComponent(".DS_Store").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: desktop.appendingPathComponent("sub/.DS_Store").path))
+    }
 }
