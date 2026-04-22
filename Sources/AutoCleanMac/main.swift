@@ -1,5 +1,7 @@
-import AutoCleanMacCore
+import AppKit
 
-// Temporary scaffold — will be replaced in Task 17 with AppDelegate-based app.
-_ = TaskResult()
-print("AutoCleanMac scaffold")
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.setActivationPolicy(.accessory) // no Dock icon
+app.run()
