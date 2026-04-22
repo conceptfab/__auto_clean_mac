@@ -54,7 +54,7 @@ public struct DevCachesTask: CleanupTask {
 
     private static func shell(_ path: String, args: [String]) -> Int32 {
         let process = Process()
-        process.launchPath = path
+        process.executableURL = URL(fileURLWithPath: path)
         process.arguments = args
         process.standardOutput = Pipe()
         process.standardError = Pipe()

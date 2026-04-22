@@ -49,6 +49,6 @@ cat > "$APP_DIR/Contents/Info.plist" <<EOF
 EOF
 
 echo "→ ad-hoc codesign"
-codesign --force --deep --sign - "$APP_DIR"
+codesign --force --sign - "$APP_DIR"
 
 echo "→ done: $APP_DIR"

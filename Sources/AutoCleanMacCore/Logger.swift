@@ -32,12 +32,15 @@ public final class Logger {
             if !FileManager.default.fileExists(atPath: file.path) {
                 FileManager.default.createFile(atPath: file.path, contents: nil)
             }
-            if let handle = try? FileHandle(forWritingTo: file) {
+            do {
+                let handle = try FileHandle(forWritingTo: file)
                 defer { try? handle.close() }
-                try? handle.seekToEnd()
+                try handle.seekToEnd()
                 if let data = line.data(using: .utf8) {
-                    try? handle.write(contentsOf: data)
+                    try handle.write(contentsOf: data)
                 }
+            } catch {
+                NSLog("AutoCleanMac.Logger: write failed for \(file.path): \(error)")
             }
         }
     }
