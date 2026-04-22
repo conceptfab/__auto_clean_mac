@@ -65,4 +65,17 @@ final class TasksTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: desktop.appendingPathComponent(".DS_Store").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: desktop.appendingPathComponent("sub/.DS_Store").path))
     }
+
+    // MARK: - UserLogsTask
+
+    func test_user_logs_deletes_old_files_only() async throws {
+        let logsRoot = tempDir.appendingPathComponent("Library/Logs")
+        try Fixtures.makeFile(at: logsRoot.appendingPathComponent("old.log"),   size: 300, ageInDays: 30)
+        try Fixtures.makeFile(at: logsRoot.appendingPathComponent("fresh.log"), size: 300, ageInDays: 1)
+        let task = UserLogsTask(isEnabled: true)
+        let result = await task.run(context: makeContext())
+        XCTAssertEqual(result.bytesFreed, 300)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: logsRoot.appendingPathComponent("old.log").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: logsRoot.appendingPathComponent("fresh.log").path))
+    }
 }
