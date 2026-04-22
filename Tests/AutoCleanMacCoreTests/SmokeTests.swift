@@ -1,8 +1,8 @@
-import Testing
+import XCTest
 @testable import AutoCleanMacCore
 
-@Suite struct SmokeTests {
-    @Test func test_version_is_defined() {
-        #expect(!AutoCleanMacCore.version.isEmpty)
+final class SmokeTests: XCTestCase {
+    func test_version_is_defined() {
+        XCTAssertFalse(AutoCleanMacCore.version.isEmpty)
     }
 }
