@@ -139,4 +139,26 @@ final class TasksTests: XCTestCase {
         let result = await task.run(context: makeContext())
         XCTAssertEqual(result.bytesFreed, 200 + 300 + 150)
     }
+
+    // MARK: - DownloadsTask
+
+    func test_downloads_deletes_old_files_but_not_hidden_or_dirs() async throws {
+        let dl = tempDir.appendingPathComponent("Downloads")
+        try Fixtures.makeFile(at: dl.appendingPathComponent("old-installer.dmg"),  size: 500, ageInDays: 30)
+        try Fixtures.makeFile(at: dl.appendingPathComponent("recent-notes.txt"),   size: 500, ageInDays: 1)
+        try Fixtures.makeFile(at: dl.appendingPathComponent(".localized"),         size: 50,  ageInDays: 30)
+        try Fixtures.makeFile(at: dl.appendingPathComponent("project/file.txt"),   size: 100, ageInDays: 30)
+        let task = DownloadsTask(isEnabled: true)
+        let result = await task.run(context: makeContext())
+        XCTAssertEqual(result.bytesFreed, 500)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dl.appendingPathComponent("recent-notes.txt").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dl.appendingPathComponent(".localized").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dl.appendingPathComponent("project/file.txt").path))
+    }
+
+    func test_downloads_default_off() async throws {
+        let task = DownloadsTask(isEnabled: false)
+        let result = await task.run(context: makeContext())
+        XCTAssertTrue(result.skipped)
+    }
 }
