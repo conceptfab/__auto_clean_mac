@@ -121,4 +121,22 @@ final class TasksTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: chromeProfile.appendingPathComponent("Cache/blob1").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: ffProfile.appendingPathComponent("entry1").path))
     }
+
+    // MARK: - DevCachesTask
+
+    func test_dev_caches_deletes_derived_data_and_npm_and_pip() async throws {
+        let derived = tempDir.appendingPathComponent("Library/Developer/Xcode/DerivedData")
+        try Fixtures.makeFile(at: derived.appendingPathComponent("proj-abc/x"), size: 200, ageInDays: 30)
+        try Fixtures.makeFile(at: derived.appendingPathComponent("proj-abc/y"), size: 50,  ageInDays: 1)
+
+        let npm = tempDir.appendingPathComponent(".npm/_cacache")
+        try Fixtures.makeFile(at: npm.appendingPathComponent("content-v2/abc"), size: 300, ageInDays: 30)
+
+        let pip = tempDir.appendingPathComponent("Library/Caches/pip")
+        try Fixtures.makeFile(at: pip.appendingPathComponent("wheels/a"), size: 150, ageInDays: 30)
+
+        let task = DevCachesTask(isEnabled: true, runBrew: false)
+        let result = await task.run(context: makeContext())
+        XCTAssertEqual(result.bytesFreed, 200 + 300 + 150)
+    }
 }
