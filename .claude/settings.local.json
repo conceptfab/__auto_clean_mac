@@ -57,7 +57,8 @@
       "Bash(chmod +x /Users/micz/__DEV__/__auto_clean_mac/scripts/uninstall.sh)",
       "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac log --oneline -5)",
       "Bash(pkill -f \"AutoCleanMac.app/Contents/MacOS/AutoCleanMac\")",
-      "Bash(/Users/micz/__DEV__/__auto_clean_mac/scripts/install.sh)"
+      "Bash(/Users/micz/__DEV__/__auto_clean_mac/scripts/install.sh)",
+      "Bash(launchctl unload *)"
     ]
   }
 }
