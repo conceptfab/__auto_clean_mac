@@ -1,9 +1,11 @@
 import AppKit
+import SwiftUI
 import AutoCleanMacCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController?
     private var consoleWindow: ConsoleWindow?
+    private var settingsWindow: NSWindow?
     private var logger: Logger!
     private var config: Config = .default
     private var isRunning = false
@@ -30,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.onShowLastLog    = { [weak self] in self?.openMostRecentLog() }
         menu.onOpenConfig     = { [weak self] in guard let self else { return }; self.openInDefaultEditor(self.configPath) }
         menu.onOpenLogsFolder = { [weak self] in guard let self else { return }; NSWorkspace.shared.open(self.logsDir) }
+        menu.onOpenSettings   = { [weak self] in self?.openSettings() }
         menu.onQuit           = { NSApp.terminate(nil) }
         menu.install()
         menuBar = menu
@@ -154,5 +157,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try? defaultJson.write(to: url, atomically: true, encoding: .utf8)
         }
         NSWorkspace.shared.open(url)
+    }
+
+    private func openSettings() {
+        if let win = settingsWindow {
+            win.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let model = SettingsModel(initial: config) { [weak self] updated in
+            guard let self else { return }
+            do {
+                try ConfigWriter.write(updated, to: self.configPath)
+                self.config = updated
+                self.logger.log(event: "config_saved", fields: ["source": "settings"])
+                self.settingsWindow?.close()
+            } catch {
+                self.logger.log(event: "config_save_failed", fields: ["error": "\(error)"])
+            }
+        }
+        let host = NSHostingController(rootView: SettingsView(model: model))
+        let win = NSWindow(contentViewController: host)
+        win.title = "AutoCleanMac — Preferencje"
+        win.styleMask = [.titled, .closable, .miniaturizable]
+        win.isReleasedWhenClosed = false
+        win.center()
+        settingsWindow = win
+        win.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
