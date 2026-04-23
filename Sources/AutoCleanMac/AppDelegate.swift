@@ -46,7 +46,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.showCentered(fadeInMs: config.window.fadeInMs)
         consoleWindow = window
 
-        let mode: SafeDeleter.Mode = ProcessInfo.processInfo.environment["AUTOCLEANMAC_DRY_RUN"] != nil ? .dryRun : .live
+        let mode: SafeDeleter.Mode = {
+            if ProcessInfo.processInfo.environment["AUTOCLEANMAC_DRY_RUN"] != nil { return .dryRun }
+            switch config.deleteMode {
+            case .trash:  return .trash
+            case .live:   return .live
+            case .dryRun: return .dryRun
+            }
+        }()
+        logger.log(event: "mode", fields: ["mode": "\(mode)"])
         let deleter = SafeDeleter(mode: mode, logger: logger)
         let ctx = CleanupContext(retentionDays: config.retentionDays, deleter: deleter, logger: logger)
         let engine = CleanupEngine.makeDefault(config: config)
@@ -123,6 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let defaultJson = """
             {
               "retention_days": 7,
+              "delete_mode": "trash",
               "window": { "fade_in_ms": 800, "hold_after_ms": 3000, "fade_out_ms": 800 },
               "tasks": {
                 "user_caches": true,
