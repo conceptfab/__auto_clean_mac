@@ -101,27 +101,6 @@ final class TasksTests: XCTestCase {
         XCTAssertEqual(result.bytesFreed, 300)
     }
 
-    // MARK: - BrowserCachesTask
-
-    func test_browser_caches_deletes_allowed_dirs_only() async throws {
-        let chromeProfile = tempDir.appendingPathComponent("Library/Application Support/Google/Chrome/Default")
-        try Fixtures.makeFile(at: chromeProfile.appendingPathComponent("Cache/blob1"),     size: 100)
-        try Fixtures.makeFile(at: chromeProfile.appendingPathComponent("Code Cache/js/x"), size: 50)
-        try Fixtures.makeFile(at: chromeProfile.appendingPathComponent("Cookies"),         size: 999)
-        try Fixtures.makeFile(at: chromeProfile.appendingPathComponent("History"),         size: 888)
-
-        let ffProfile = tempDir.appendingPathComponent("Library/Application Support/Firefox/Profiles/abcd.default/cache2")
-        try Fixtures.makeFile(at: ffProfile.appendingPathComponent("entry1"), size: 40)
-
-        let task = BrowserCachesTask(isEnabled: true)
-        let result = await task.run(context: makeContext())
-        XCTAssertEqual(result.bytesFreed, 190)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: chromeProfile.appendingPathComponent("Cookies").path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: chromeProfile.appendingPathComponent("History").path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: chromeProfile.appendingPathComponent("Cache/blob1").path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: ffProfile.appendingPathComponent("entry1").path))
-    }
-
     // MARK: - DevCachesTask
 
     func test_dev_caches_deletes_derived_data_and_npm_and_pip() async throws {

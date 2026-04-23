@@ -48,15 +48,21 @@ public final class CleanupEngine {
 
 public extension CleanupEngine {
     static func makeDefault(config: Config) -> CleanupEngine {
-        CleanupEngine(tasks: [
+        var all: [CleanupTask] = [
             UserCachesTask(isEnabled: config.tasks.userCaches),
             SystemTempTask(isEnabled: config.tasks.systemTemp),
             TrashTask(isEnabled: config.tasks.trash),
             DSStoreTask(isEnabled: config.tasks.dsStore),
             UserLogsTask(isEnabled: config.tasks.userLogs),
-            BrowserCachesTask(isEnabled: config.tasks.browserCaches),
             DevCachesTask(isEnabled: config.tasks.devCaches),
             DownloadsTask(isEnabled: config.tasks.downloads),
-        ])
+        ]
+        for browser in BrowserIdentity.allCases {
+            let prefs = config.browsers[browser, default: .none]
+            for type in BrowserDataType.allCases where prefs.contains(type) {
+                all.append(BrowserDataTask(browser: browser, dataType: type, isEnabled: true))
+            }
+        }
+        return CleanupEngine(tasks: all)
     }
 }

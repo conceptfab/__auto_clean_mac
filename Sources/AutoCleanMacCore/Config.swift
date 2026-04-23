@@ -45,13 +45,12 @@ public struct Config: Equatable {
         public var trash: Bool
         public var dsStore: Bool
         public var userLogs: Bool
-        public var browserCaches: Bool
         public var devCaches: Bool
         public var downloads: Bool
 
         public static let `default` = Tasks(
             userCaches: true, systemTemp: true, trash: true, dsStore: true,
-            userLogs: true, browserCaches: true, devCaches: true, downloads: false
+            userLogs: true, devCaches: true, downloads: false
         )
     }
 
@@ -92,7 +91,6 @@ public struct Config: Equatable {
             if let v = t["trash"]          as? Bool { config.tasks.trash         = v }
             if let v = t["ds_store"]       as? Bool { config.tasks.dsStore       = v }
             if let v = t["user_logs"]      as? Bool { config.tasks.userLogs      = v }
-            if let v = t["browser_caches"] as? Bool { config.tasks.browserCaches = v }
             if let v = t["dev_caches"]     as? Bool { config.tasks.devCaches     = v }
             if let v = t["downloads"]      as? Bool { config.tasks.downloads     = v }
         }
