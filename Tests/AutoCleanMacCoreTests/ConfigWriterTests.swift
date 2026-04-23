@@ -57,4 +57,31 @@ final class ConfigWriterTests: XCTestCase {
         try ConfigWriter.write(Config.default, to: nested)
         XCTAssertTrue(FileManager.default.fileExists(atPath: nested.path))
     }
+
+    func test_full_config_round_trip_equality() throws {
+        var cfg = Config.default
+        cfg.retentionDays = 21
+        cfg.deleteMode = .trash
+        cfg.window = Config.Window(fadeInMs: 500, holdAfterMs: 2500, fadeOutMs: 600)
+        cfg.tasks = Config.Tasks(
+            userCaches: false,
+            systemTemp: true,
+            trash: false,
+            dsStore: true,
+            userLogs: false,
+            devCaches: true,
+            downloads: true
+        )
+        cfg.browsers = [
+            .chrome:  BrowserPreferences(types: [.cache, .cookies, .history]),
+            .firefox: BrowserPreferences(types: [.cookies]),
+            .brave:   BrowserPreferences(types: [.cache]),
+        ]
+
+        let file = tempDir.appendingPathComponent("full.json")
+        try ConfigWriter.write(cfg, to: file)
+
+        let reloaded = Config.loadOrDefault(from: file, warn: { _ in })
+        XCTAssertEqual(reloaded, cfg, "pełny Config musi się zachować przez ConfigWriter round-trip")
+    }
 }

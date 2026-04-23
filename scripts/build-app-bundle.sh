@@ -28,6 +28,10 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$BUILD_DIR/$APP_NAME" "$MACOS_DIR/$APP_NAME"
 chmod +x "$MACOS_DIR/$APP_NAME"
 
+if [[ -f "$REPO_ROOT/resources/$APP_NAME.icns" ]]; then
+    cp "$REPO_ROOT/resources/$APP_NAME.icns" "$RESOURCES_DIR/$APP_NAME.icns"
+fi
+
 cat > "$APP_DIR/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -35,6 +39,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<EOF
 <dict>
     <key>CFBundleDevelopmentRegion</key>       <string>en</string>
     <key>CFBundleExecutable</key>              <string>$APP_NAME</string>
+    <key>CFBundleIconFile</key>                <string>$APP_NAME</string>
     <key>CFBundleIdentifier</key>              <string>$BUNDLE_ID</string>
     <key>CFBundleInfoDictionaryVersion</key>   <string>6.0</string>
     <key>CFBundleName</key>                    <string>$APP_NAME</string>
