@@ -5,13 +5,17 @@ import AutoCleanMacCore
 final class SettingsModel: ObservableObject {
     @Published var browsers: [BrowserIdentity: BrowserPreferences]
 
-    let onApply: (Config) -> Void
+    let onApply:    (Config) -> Void         // tylko zapis
+    let onApplyRun: (Config) -> Void         // zapis + natychmiastowe sprzątanie
     private let baseConfig: Config
 
-    init(initial: Config, onApply: @escaping (Config) -> Void) {
+    init(initial: Config,
+         onApply:    @escaping (Config) -> Void,
+         onApplyRun: @escaping (Config) -> Void) {
         self.baseConfig = initial
         self.browsers = initial.browsers
         self.onApply = onApply
+        self.onApplyRun = onApplyRun
     }
 
     func toggle(_ browser: BrowserIdentity, _ type: BrowserDataType, _ enabled: Bool) {
@@ -24,11 +28,14 @@ final class SettingsModel: ObservableObject {
         browsers[browser, default: .none].contains(type)
     }
 
-    func apply() {
+    private func currentConfig() -> Config {
         var updated = baseConfig
         updated.browsers = browsers
-        onApply(updated)
+        return updated
     }
+
+    func apply()    { onApply(currentConfig()) }
+    func applyRun() { onApplyRun(currentConfig()) }
 }
 
 struct SettingsView: View {
@@ -92,6 +99,7 @@ private struct BrowsersTab: View {
             HStack {
                 Spacer()
                 Button("Zapisz") { model.apply() }
+                Button("Zapisz i wyczyść teraz") { model.applyRun() }
                     .keyboardShortcut(.defaultAction)
             }
         }

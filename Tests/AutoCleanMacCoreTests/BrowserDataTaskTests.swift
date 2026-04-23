@@ -142,4 +142,23 @@ final class BrowserDataTaskTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("formhistory.sqlite").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("downloads.sqlite").path))
     }
+
+    func test_chrome_history_also_deletes_session_restore_files() async throws {
+        let profile = tempDir.appendingPathComponent("Library/Application Support/Google/Chrome/Default")
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Current Session"), size: 100)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Current Tabs"),    size: 50)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Last Session"),    size: 80)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Last Tabs"),       size: 40)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Sessions/Session_00000001"), size: 200)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Bookmarks"),       size: 999) // zostaje
+
+        let task = BrowserDataTask(browser: .chrome, dataType: .history, isEnabled: true, isBrowserRunning: { _ in false })
+        let result = await task.run(context: context())
+
+        XCTAssertEqual(result.bytesFreed, 470)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("Current Session").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("Last Session").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("Sessions").path))
+        XCTAssertTrue (FileManager.default.fileExists(atPath: profile.appendingPathComponent("Bookmarks").path))
+    }
 }

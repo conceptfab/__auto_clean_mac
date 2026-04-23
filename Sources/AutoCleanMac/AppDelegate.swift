@@ -159,33 +159,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.open(url)
     }
 
+    private func persistConfig(_ updated: Config) {
+        do {
+            try ConfigWriter.write(updated, to: self.configPath)
+            self.config = updated
+            self.logger.log(event: "config_saved", fields: ["source": "settings"])
+            self.settingsWindow?.close()
+        } catch {
+            self.logger.log(event: "config_save_failed", fields: ["error": "\(error)"])
+            let alert = NSAlert()
+            alert.messageText = "Nie udało się zapisać preferencji"
+            alert.informativeText = "\(error)"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            if let win = self.settingsWindow {
+                alert.beginSheetModal(for: win, completionHandler: nil)
+            } else {
+                alert.runModal()
+            }
+        }
+    }
+
     private func openSettings() {
         if let win = settingsWindow {
             win.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        let model = SettingsModel(initial: config) { [weak self] updated in
-            guard let self else { return }
-            do {
-                try ConfigWriter.write(updated, to: self.configPath)
-                self.config = updated
-                self.logger.log(event: "config_saved", fields: ["source": "settings"])
-                self.settingsWindow?.close()
-            } catch {
-                self.logger.log(event: "config_save_failed", fields: ["error": "\(error)"])
-                let alert = NSAlert()
-                alert.messageText = "Nie udało się zapisać preferencji"
-                alert.informativeText = "\(error)"
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "OK")
-                if let win = self.settingsWindow {
-                    alert.beginSheetModal(for: win, completionHandler: nil)
-                } else {
-                    alert.runModal()
-                }
+        let model = SettingsModel(
+            initial: config,
+            onApply: { [weak self] updated in
+                self?.persistConfig(updated)
+            },
+            onApplyRun: { [weak self] updated in
+                guard let self else { return }
+                self.persistConfig(updated)
+                self.runCleanup(source: "settings")
             }
-        }
+        )
         let host = NSHostingController(rootView: SettingsView(model: model))
         let win = NSWindow(contentViewController: host)
         win.title = "AutoCleanMac — Preferencje"

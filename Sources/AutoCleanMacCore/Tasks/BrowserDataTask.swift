@@ -102,9 +102,17 @@ public struct BrowserDataTask: CleanupTask {
             return [
                 profile.appendingPathComponent("History"),
                 profile.appendingPathComponent("History-journal"),
+                profile.appendingPathComponent("History Provider Cache"),
                 profile.appendingPathComponent("Visited Links"),
                 profile.appendingPathComponent("Top Sites"),
                 profile.appendingPathComponent("Top Sites-journal"),
+                // Session restore — bez tego przeglądarka wraca do poprzednich tabów
+                profile.appendingPathComponent("Sessions"),
+                profile.appendingPathComponent("Session Storage"),
+                profile.appendingPathComponent("Current Session"),
+                profile.appendingPathComponent("Current Tabs"),
+                profile.appendingPathComponent("Last Session"),
+                profile.appendingPathComponent("Last Tabs"),
             ]
         case (false, .history):
             // CELOWO nie tykamy places.sqlite — zawiera zakładki. Czyścimy tylko poboczne bazy historii.
