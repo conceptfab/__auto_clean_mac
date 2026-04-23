@@ -60,28 +60,31 @@ struct SettingsView: View {
     @ObservedObject var model: SettingsModel
 
     var body: some View {
-        TabView {
-            GeneralTab(model: model)
-                .tabItem { Label("Ogólne", systemImage: "gear") }
-            CleanupTab(model: model)
-                .tabItem { Label("Czyszczenie", systemImage: "trash") }
-            BrowsersTab(model: model)
-                .tabItem { Label("Przeglądarki", systemImage: "globe") }
-            LogsTab(model: model)
-                .tabItem { Label("Logi", systemImage: "doc.text") }
-        }
-        .frame(width: 560, height: 480)
-        .padding()
-        .safeAreaInset(edge: .bottom) {
-            HStack {
+        VStack(spacing: 0) {
+            TabView {
+                GeneralTab(model: model)
+                    .tabItem { Label("Ogólne", systemImage: "gear") }
+                CleanupTab(model: model)
+                    .tabItem { Label("Czyszczenie", systemImage: "trash") }
+                BrowsersTab(model: model)
+                    .tabItem { Label("Przeglądarki", systemImage: "globe") }
+                LogsTab(model: model)
+                    .tabItem { Label("Logi", systemImage: "doc.text") }
+            }
+
+            Divider()
+
+            HStack(spacing: 8) {
                 Spacer()
                 Button("Zapisz") { model.apply() }
                 Button("Zapisz i wyczyść teraz") { model.applyRun() }
                     .keyboardShortcut(.defaultAction)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.bar)
         }
+        .frame(width: 600, height: 540)
     }
 }
 
@@ -92,24 +95,67 @@ private struct GeneralTab: View {
 
     var body: some View {
         Form {
-            Section("Retencja") {
-                Stepper(value: $model.retentionDays, in: 1...30) {
-                    Text("Przechowuj rzeczy nowsze niż **\(model.retentionDays)** dni")
+            Section {
+                LabeledContent {
+                    HStack(spacing: 6) {
+                        Text("\(model.retentionDays)")
+                            .monospacedDigit()
+                            .frame(minWidth: 24, alignment: .trailing)
+                        Text("dni")
+                            .foregroundStyle(.secondary)
+                        Stepper("", value: $model.retentionDays, in: 1...30)
+                            .labelsHidden()
+                    }
+                } label: {
+                    Text("Przechowuj rzeczy nowsze niż")
                 }
-                Text("Dotyczy zadań które respektują okres retencji (np. logi, Downloads jeśli włączone). Inne zadania usuwają bez względu na wiek.")
-                    .font(.footnote).foregroundStyle(.secondary)
+            } header: {
+                Text("Retencja")
+            } footer: {
+                Text("Dotyczy zadań respektujących okres retencji (logi, Downloads). Pozostałe zadania usuwają bez względu na wiek.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-            Section("Tryb usuwania") {
-                Picker("", selection: $model.deleteMode) {
-                    Text("Kosz (odwracalne, bezpieczne)").tag(DeleteMode.trash)
-                    Text("Trwale usuń (rm)").tag(DeleteMode.live)
-                    Text("Tylko symulacja (dry-run)").tag(DeleteMode.dryRun)
+
+            Section {
+                ForEach(DeleteMode.allCasesOrdered, id: \.self) { mode in
+                    DeleteModeRow(
+                        mode: mode,
+                        selected: model.deleteMode == mode,
+                        onSelect: { model.deleteMode = mode }
+                    )
                 }
-                .pickerStyle(.radioGroup)
-                .labelsHidden()
+            } header: {
+                Text("Tryb usuwania")
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct DeleteModeRow: View {
+    let mode: DeleteMode
+    let selected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(selected ? Color.accentColor : .secondary)
+                    .font(.system(size: 14))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(mode.title)
+                    Text(mode.summary)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -118,21 +164,57 @@ private struct CleanupTab: View {
 
     var body: some View {
         Form {
-            Section("Zadania systemowe") {
-                Toggle("Cache użytkownika (~/Library/Caches)",             isOn: $model.tasks.userCaches)
-                Toggle("System Temp (/tmp, TemporaryItems)",                isOn: $model.tasks.systemTemp)
-                Toggle("Kosz (~/.Trash — opróżnianie)",                     isOn: $model.tasks.trash)
-                Toggle(".DS_Store (w całym $HOME)",                         isOn: $model.tasks.dsStore)
-                Toggle("Logi użytkownika (~/Library/Logs)",                 isOn: $model.tasks.userLogs)
-                Toggle("Cache devtools (DerivedData, npm, pip, brew)",      isOn: $model.tasks.devCaches)
-                Toggle("Downloads (pliki starsze niż retencja)",            isOn: $model.tasks.downloads)
-            }
             Section {
-                Text("Zadania respektują ustawienie retencji z zakładki Ogólne tylko tam gdzie to ma sens (logi, Downloads). Cache usuwane są od razu.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                Toggle(isOn: $model.tasks.userCaches) {
+                    ItemLabel(title: "Cache użytkownika",
+                              detail: "~/Library/Caches")
+                }
+                Toggle(isOn: $model.tasks.systemTemp) {
+                    ItemLabel(title: "System Temp",
+                              detail: "/tmp, TemporaryItems")
+                }
+                Toggle(isOn: $model.tasks.trash) {
+                    ItemLabel(title: "Kosz",
+                              detail: "Opróżnia ~/.Trash")
+                }
+                Toggle(isOn: $model.tasks.dsStore) {
+                    ItemLabel(title: ".DS_Store",
+                              detail: "W całym katalogu domowym")
+                }
+                Toggle(isOn: $model.tasks.userLogs) {
+                    ItemLabel(title: "Logi użytkownika",
+                              detail: "~/Library/Logs (respektuje retencję)")
+                }
+                Toggle(isOn: $model.tasks.devCaches) {
+                    ItemLabel(title: "Cache devtools",
+                              detail: "DerivedData, npm, pip, brew")
+                }
+                Toggle(isOn: $model.tasks.downloads) {
+                    ItemLabel(title: "Downloads",
+                              detail: "Pliki starsze niż retencja")
+                }
+            } header: {
+                Text("Zadania systemowe")
+            } footer: {
+                Text("Retencję respektują tylko logi i Downloads. Cache usuwane są od razu.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct ItemLabel: View {
+    let title: String
+    let detail: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title)
+            Text(detail)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -140,35 +222,44 @@ private struct BrowsersTab: View {
     @ObservedObject var model: SettingsModel
 
     private var installed: [BrowserIdentity] {
-        BrowserIdentity.allCases.filter { $0.isInstalled(homeDirectory: model.homeDirectory) }
+        BrowserIdentity.allCases.filter { $0.isInstalled() }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        Form {
             if installed.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Nie wykryto obsługiwanych przeglądarek.")
-                        .font(.headline)
-                    Text("AutoCleanMac obsługuje Chrome, Firefox, Edge, Brave, Vivaldi, Arc. Safari wymaga dodatkowych uprawnień i pojawi się w następnej wersji.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Nie wykryto obsługiwanych przeglądarek.")
+                            .font(.headline)
+                        Text("AutoCleanMac obsługuje Chrome, Firefox, Edge, Brave, Vivaldi, Arc. Safari wymaga dodatkowych uprawnień — pojawi się w następnej wersji.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 4)
                 }
-                .padding()
-                Spacer()
             } else {
-                Text("Wybierz co wyczyścić (tylko zainstalowane przeglądarki):")
-                    .font(.headline)
-
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-                    GridRow {
-                        Text("").frame(minWidth: 140, alignment: .leading)
+                Section {
+                    // Header row
+                    HStack(spacing: 0) {
+                        Text("Przeglądarka")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         ForEach(BrowserDataType.allCases, id: \.self) { type in
-                            Text(type.displayName).bold().frame(minWidth: 90, alignment: .center)
+                            Text(type.displayName)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 80, alignment: .center)
                         }
                     }
-                    Divider()
+                    .padding(.vertical, 2)
+
                     ForEach(installed, id: \.self) { browser in
-                        GridRow {
-                            Text(browser.displayName).frame(minWidth: 140, alignment: .leading)
+                        HStack(spacing: 0) {
+                            Text(browser.displayName)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             ForEach(BrowserDataType.allCases, id: \.self) { type in
                                 Toggle("", isOn: Binding(
                                     get: { model.isOn(browser, type) },
@@ -176,27 +267,25 @@ private struct BrowsersTab: View {
                                 ))
                                 .labelsHidden()
                                 .accessibilityLabel("\(browser.displayName) — \(type.displayName)")
-                                .frame(minWidth: 90, alignment: .center)
+                                .frame(width: 80, alignment: .center)
                             }
                         }
                     }
+                } header: {
+                    Text("Dane do wyczyszczenia")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Ciasteczka = wylogowanie z serwisów.", systemImage: "info.circle")
+                        Label("„Historia” czyści też sesje i faviconsy — bez tego Chromium wraca do ostatnich tabów.", systemImage: "exclamationmark.triangle")
+                        Label("Firefox: historia dzieli bazę z zakładkami (places.sqlite) — jej nie tykamy. Czyścimy autofill i historię pobrań.", systemImage: "exclamationmark.triangle")
+                        Label("Uruchomione przeglądarki są pomijane — zamknij je przed czyszczeniem.", systemImage: "info.circle")
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 }
-
-                Divider()
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Ciasteczka = wylogowanie z serwisów.", systemImage: "info.circle")
-                    Label("„Historia” czyści też sesje (Current/Last Session) i faviconsy — bez tego przeglądarka wraca do ostatnio otwartych tabów.", systemImage: "exclamationmark.triangle")
-                    Label("Dla Firefoxa historia przeglądania jest w tej samej bazie co zakładki (places.sqlite) — jej nie tykamy. Czyścimy tylko autofill i historię pobrań.", systemImage: "exclamationmark.triangle")
-                    Label("Pomijamy przeglądarki które są uruchomione — zamknij je przed sprzątaniem.", systemImage: "info.circle")
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-                Spacer()
             }
         }
-        .padding()
+        .formStyle(.grouped)
     }
 }
 
@@ -204,19 +293,51 @@ private struct LogsTab: View {
     @ObservedObject var model: SettingsModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Logi")
-                .font(.headline)
-            Text("Każde uruchomienie zapisuje zdarzenia do `~/Library/Logs/AutoCleanMac/YYYY-MM-DD.log`.")
-                .font(.footnote).foregroundStyle(.secondary)
-
-            HStack {
-                Button("Otwórz folder logów") { model.onOpenLogsFolder() }
-                Button("Pokaż ostatni log")   { model.onShowLastLog() }
+        Form {
+            Section {
+                HStack(spacing: 10) {
+                    Button {
+                        model.onOpenLogsFolder()
+                    } label: {
+                        Label("Otwórz folder logów", systemImage: "folder")
+                    }
+                    Button {
+                        model.onShowLastLog()
+                    } label: {
+                        Label("Pokaż ostatni log", systemImage: "doc.text.magnifyingglass")
+                    }
+                }
+                .padding(.vertical, 2)
+            } header: {
+                Text("Logi")
+            } footer: {
+                Text("Każde uruchomienie zapisuje zdarzenia do ~/Library/Logs/AutoCleanMac/YYYY-MM-DD.log.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-
-            Spacer()
         }
-        .padding()
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - DeleteMode helpers
+
+private extension DeleteMode {
+    static var allCasesOrdered: [DeleteMode] { [.trash, .live, .dryRun] }
+
+    var title: String {
+        switch self {
+        case .trash:  return "Kosz"
+        case .live:   return "Trwale usuń (rm)"
+        case .dryRun: return "Tylko symulacja (dry-run)"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .trash:  return "Pliki trafiają do ~/.Trash. Odwracalne, bezpieczne."
+        case .live:   return "Usuwa natychmiast. Zwalnia miejsce od razu, bez odzyskiwania."
+        case .dryRun: return "Nic nie usuwa, tylko loguje. Do testów ustawień."
+        }
     }
 }

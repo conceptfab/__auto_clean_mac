@@ -4,3 +4,7 @@
 DerivedData/
 *.dSYM/
 .DS_Store
+.claude/
+# Raw user-provided icon sources (derived files are committed under resources/)
+/icon.png
+/mini_icon.png

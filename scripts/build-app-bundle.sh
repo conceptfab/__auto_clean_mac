@@ -32,6 +32,12 @@ if [[ -f "$REPO_ROOT/resources/$APP_NAME.icns" ]]; then
     cp "$REPO_ROOT/resources/$APP_NAME.icns" "$RESOURCES_DIR/$APP_NAME.icns"
 fi
 
+for menubar_icon in MenuBarIcon.png MenuBarIcon@2x.png; do
+    if [[ -f "$REPO_ROOT/resources/$menubar_icon" ]]; then
+        cp "$REPO_ROOT/resources/$menubar_icon" "$RESOURCES_DIR/$menubar_icon"
+    fi
+done
+
 cat > "$APP_DIR/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
