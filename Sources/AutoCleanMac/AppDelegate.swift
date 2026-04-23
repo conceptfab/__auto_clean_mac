@@ -28,12 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = MenuBarController()
-        menu.onRunNow         = { [weak self] in self?.runCleanup(source: "menu") }
-        menu.onShowLastLog    = { [weak self] in self?.openMostRecentLog() }
-        menu.onOpenConfig     = { [weak self] in guard let self else { return }; self.openInDefaultEditor(self.configPath) }
-        menu.onOpenLogsFolder = { [weak self] in guard let self else { return }; NSWorkspace.shared.open(self.logsDir) }
-        menu.onOpenSettings   = { [weak self] in self?.openSettings() }
-        menu.onQuit           = { NSApp.terminate(nil) }
+        menu.onRunNow        = { [weak self] in self?.runCleanup(source: "menu") }
+        menu.onOpenSettings  = { [weak self] in self?.openSettings() }
+        menu.onQuit          = { NSApp.terminate(nil) }
         menu.install()
         menuBar = menu
 
@@ -186,16 +183,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.activate(ignoringOtherApps: true)
             return
         }
+        let home = FileManager.default.homeDirectoryForCurrentUser
         let model = SettingsModel(
             initial: config,
-            onApply: { [weak self] updated in
-                self?.persistConfig(updated)
-            },
-            onApplyRun: { [weak self] updated in
+            homeDirectory: home,
+            onApply:     { [weak self] updated in self?.persistConfig(updated) },
+            onApplyRun:  { [weak self] updated in
                 guard let self else { return }
                 self.persistConfig(updated)
                 self.runCleanup(source: "settings")
-            }
+            },
+            onOpenLogsFolder: { [weak self] in
+                guard let self else { return }
+                NSWorkspace.shared.open(self.logsDir)
+            },
+            onShowLastLog: { [weak self] in self?.openMostRecentLog() }
         )
         let host = NSHostingController(rootView: SettingsView(model: model))
         let win = NSWindow(contentViewController: host)

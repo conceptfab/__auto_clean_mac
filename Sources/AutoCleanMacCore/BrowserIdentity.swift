@@ -53,6 +53,11 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
         case .firefox: return false
         }
     }
+
+    /// True if any of the browser's profile roots exists on disk — lazy way to detect install.
+    public func isInstalled(homeDirectory: URL, fileManager: FileManager = .default) -> Bool {
+        profileRoots(homeDirectory: homeDirectory).contains { fileManager.fileExists(atPath: $0.path) }
+    }
 }
 
 public enum BrowserDataType: String, CaseIterable, Equatable, Hashable {
