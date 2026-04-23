@@ -58,7 +58,11 @@
       "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac log --oneline -5)",
       "Bash(pkill -f \"AutoCleanMac.app/Contents/MacOS/AutoCleanMac\")",
       "Bash(/Users/micz/__DEV__/__auto_clean_mac/scripts/install.sh)",
-      "Bash(launchctl unload *)"
+      "Bash(launchctl unload *)",
+      "Bash(python3 -m json.tool)",
+      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac worktree list)",
+      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac log --oneline -1 main)",
+      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac log --oneline -1 origin/main)"
     ]
   }
 }
