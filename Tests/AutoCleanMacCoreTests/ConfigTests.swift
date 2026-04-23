@@ -60,4 +60,33 @@ final class ConfigTests: XCTestCase {
         let config = Config.loadOrDefault(from: file, warn: { _ in })
         XCTAssertEqual(config.retentionDays, 3)
     }
+
+    func test_default_delete_mode_is_trash() {
+        let missing = tempDir.appendingPathComponent("nope.json")
+        let config = Config.loadOrDefault(from: missing, warn: { _ in })
+        XCTAssertEqual(config.deleteMode, .trash)
+    }
+
+    func test_loads_delete_mode_live() throws {
+        let file = tempDir.appendingPathComponent("c.json")
+        try #"{ "delete_mode": "live" }"#.write(to: file, atomically: true, encoding: .utf8)
+        let config = Config.loadOrDefault(from: file, warn: { _ in })
+        XCTAssertEqual(config.deleteMode, .live)
+    }
+
+    func test_loads_delete_mode_dry_run() throws {
+        let file = tempDir.appendingPathComponent("c.json")
+        try #"{ "delete_mode": "dry_run" }"#.write(to: file, atomically: true, encoding: .utf8)
+        let config = Config.loadOrDefault(from: file, warn: { _ in })
+        XCTAssertEqual(config.deleteMode, .dryRun)
+    }
+
+    func test_unknown_delete_mode_warns_and_keeps_default() throws {
+        let file = tempDir.appendingPathComponent("c.json")
+        try #"{ "delete_mode": "nuke_everything" }"#.write(to: file, atomically: true, encoding: .utf8)
+        var warnings: [String] = []
+        let config = Config.loadOrDefault(from: file, warn: { warnings.append($0) })
+        XCTAssertEqual(config.deleteMode, .trash)
+        XCTAssertTrue(warnings.contains(where: { $0.contains("delete_mode") }))
+    }
 }

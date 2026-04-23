@@ -1,5 +1,20 @@
 import Foundation
 
+public enum DeleteMode: String, Equatable {
+    case trash
+    case live
+    case dryRun
+
+    public static func parse(_ raw: String) -> DeleteMode? {
+        switch raw {
+        case "trash":    return .trash
+        case "live":     return .live
+        case "dry_run":  return .dryRun
+        default:         return nil
+        }
+    }
+}
+
 public struct Config: Equatable {
     public struct Window: Equatable {
         public var fadeInMs: Int
@@ -28,9 +43,10 @@ public struct Config: Equatable {
     public var retentionDays: Int
     public var window: Window
     public var tasks: Tasks
+    public var deleteMode: DeleteMode
 
     public static let `default` = Config(
-        retentionDays: 7, window: .default, tasks: .default
+        retentionDays: 7, window: .default, tasks: .default, deleteMode: .trash
     )
 
     public static func loadOrDefault(from url: URL, warn: (String) -> Void) -> Config {
@@ -61,6 +77,13 @@ public struct Config: Equatable {
             if let v = t["browser_caches"] as? Bool { config.tasks.browserCaches = v }
             if let v = t["dev_caches"]     as? Bool { config.tasks.devCaches     = v }
             if let v = t["downloads"]      as? Bool { config.tasks.downloads     = v }
+        }
+        if let raw = json["delete_mode"] as? String {
+            if let mode = DeleteMode.parse(raw) {
+                config.deleteMode = mode
+            } else {
+                warn("Nieznana wartość delete_mode: \"\(raw)\" — używam wartości domyślnej (\(config.deleteMode.rawValue))")
+            }
         }
         return config
     }
