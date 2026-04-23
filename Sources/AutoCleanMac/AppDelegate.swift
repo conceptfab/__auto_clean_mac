@@ -54,7 +54,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .dryRun: return .dryRun
             }
         }()
-        logger.log(event: "mode", fields: ["mode": "\(mode)"])
+        let modeString: String
+        switch mode {
+        case .live:   modeString = "live"
+        case .dryRun: modeString = "dry_run"
+        case .trash:  modeString = "trash"
+        }
+        logger.log(event: "mode", fields: ["mode": modeString])
         let deleter = SafeDeleter(mode: mode, logger: logger)
         let ctx = CleanupContext(retentionDays: config.retentionDays, deleter: deleter, logger: logger)
         let engine = CleanupEngine.makeDefault(config: config)
