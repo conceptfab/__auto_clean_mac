@@ -64,7 +64,7 @@ public final class SafeDeleter {
             guard let enumerator = fm.enumerator(
                 at: url,
                 includingPropertiesForKeys: keys,
-                options: [.skipsHiddenFiles],
+                options: [],
                 errorHandler: { _, _ in true }
             ) else {
                 return (attrs[.size] as? Int64) ?? 0

@@ -96,4 +96,15 @@ final class SafeDeleterTests: XCTestCase {
         XCTAssertEqual(freed, 1_000)
         XCTAssertTrue(FileManager.default.fileExists(atPath: dir.path))
     }
+
+    func test_delete_directory_counts_hidden_files() throws {
+        let root = tempDir.appendingPathComponent("root")
+        let dir = root.appendingPathComponent("cache")
+        try Fixtures.makeFile(at: dir.appendingPathComponent("visible.bin"), size: 200)
+        try Fixtures.makeFile(at: dir.appendingPathComponent(".DS_Store"), size: 300)
+        try Fixtures.makeFile(at: dir.appendingPathComponent(".hidden/blob.bin"), size: 500)
+        let deleter = SafeDeleter(mode: .dryRun, logger: logger)
+        let freed = try deleter.delete(dir, withinRoot: root)
+        XCTAssertEqual(freed, 1_000)
+    }
 }
