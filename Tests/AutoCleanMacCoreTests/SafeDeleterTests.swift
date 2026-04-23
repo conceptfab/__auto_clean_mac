@@ -73,4 +73,27 @@ final class SafeDeleterTests: XCTestCase {
         let deleter = SafeDeleter(mode: .live, logger: logger)
         XCTAssertThrowsError(try deleter.delete(file, withinRoot: root))
     }
+
+    func test_delete_directory_returns_recursive_size() throws {
+        let root = tempDir.appendingPathComponent("root")
+        let dir = root.appendingPathComponent("cache")
+        try Fixtures.makeFile(at: dir.appendingPathComponent("a.bin"), size: 1_000)
+        try Fixtures.makeFile(at: dir.appendingPathComponent("sub/b.bin"), size: 2_500)
+        try Fixtures.makeFile(at: dir.appendingPathComponent("sub/deeper/c.bin"), size: 500)
+        let deleter = SafeDeleter(mode: .live, logger: logger)
+        let freed = try deleter.delete(dir, withinRoot: root)
+        XCTAssertEqual(freed, 4_000)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dir.path))
+    }
+
+    func test_dry_run_directory_returns_recursive_size_without_deleting() throws {
+        let root = tempDir.appendingPathComponent("root")
+        let dir = root.appendingPathComponent("cache")
+        try Fixtures.makeFile(at: dir.appendingPathComponent("x.bin"), size: 300)
+        try Fixtures.makeFile(at: dir.appendingPathComponent("y.bin"), size: 700)
+        let deleter = SafeDeleter(mode: .dryRun, logger: logger)
+        let freed = try deleter.delete(dir, withinRoot: root)
+        XCTAssertEqual(freed, 1_000)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dir.path))
+    }
 }

@@ -36,11 +36,12 @@ public final class SafeDeleter {
             throw DeletionError.outsideAllowedRoot(path: pathStr, root: rootStr)
         }
 
-        // Use lstat-style attributes so symlinks themselves can be sized/removed.
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path.path) else {
+        let size: Int64
+        do {
+            size = try Self.recursiveSize(at: path)
+        } catch {
             throw DeletionError.notFound(path: path.path)
         }
-        let size = (attrs[.size] as? Int64) ?? 0
 
         let event = mode == .dryRun ? "dryrun" : "delete"
         logger.log(event: event, fields: ["path": path.path, "size": "\(size)"])
@@ -49,5 +50,38 @@ public final class SafeDeleter {
             try FileManager.default.removeItem(at: path)
         }
         return size
+    }
+
+    /// Returns the sum of file sizes under `url`, recursing into directories.
+    /// Does not follow symlinks to directories (they are sized by their link size via lstat).
+    private static func recursiveSize(at url: URL) throws -> Int64 {
+        let fm = FileManager.default
+        let attrs = try fm.attributesOfItem(atPath: url.path)
+        let type = attrs[.type] as? FileAttributeType
+        if type == .typeDirectory {
+            var total: Int64 = 0
+            let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey]
+            guard let enumerator = fm.enumerator(
+                at: url,
+                includingPropertiesForKeys: keys,
+                options: [.skipsHiddenFiles],
+                errorHandler: { _, _ in true }
+            ) else {
+                return (attrs[.size] as? Int64) ?? 0
+            }
+            for case let child as URL in enumerator {
+                let values = try? child.resourceValues(forKeys: Set(keys))
+                if values?.isDirectory == true { continue }
+                if values?.isSymbolicLink == true {
+                    let linkAttrs = try? fm.attributesOfItem(atPath: child.path)
+                    total += (linkAttrs?[.size] as? Int64) ?? 0
+                    continue
+                }
+                total += Int64(values?.fileSize ?? 0)
+            }
+            return total
+        } else {
+            return (attrs[.size] as? Int64) ?? 0
+        }
     }
 }
