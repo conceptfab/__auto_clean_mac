@@ -98,9 +98,24 @@ public struct BrowserDataTask: CleanupTask {
                 profile.appendingPathComponent("cookies.sqlite-wal"),
                 profile.appendingPathComponent("cookies.sqlite-shm"),
             ]
-        case (true, .history), (false, .history):
-            // wypełnione w Tasku 5
-            return []
+        case (true, .history):
+            return [
+                profile.appendingPathComponent("History"),
+                profile.appendingPathComponent("History-journal"),
+                profile.appendingPathComponent("Visited Links"),
+                profile.appendingPathComponent("Top Sites"),
+                profile.appendingPathComponent("Top Sites-journal"),
+            ]
+        case (false, .history):
+            // CELOWO nie tykamy places.sqlite — zawiera zakładki. Czyścimy tylko poboczne bazy historii.
+            return [
+                profile.appendingPathComponent("formhistory.sqlite"),
+                profile.appendingPathComponent("formhistory.sqlite-wal"),
+                profile.appendingPathComponent("formhistory.sqlite-shm"),
+                profile.appendingPathComponent("downloads.sqlite"),
+                profile.appendingPathComponent("downloads.sqlite-wal"),
+                profile.appendingPathComponent("downloads.sqlite-shm"),
+            ]
         }
     }
 }

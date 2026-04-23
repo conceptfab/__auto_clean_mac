@@ -113,4 +113,33 @@ final class BrowserDataTaskTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("cookies.sqlite").path))
         XCTAssertTrue (FileManager.default.fileExists(atPath: profile.appendingPathComponent("places.sqlite").path))
     }
+
+    func test_chrome_history_deletes_History_and_journal() async throws {
+        let profile = tempDir.appendingPathComponent("Library/Application Support/Google/Chrome/Default")
+        try Fixtures.makeFile(at: profile.appendingPathComponent("History"),         size: 800)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("History-journal"), size: 40)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Bookmarks"),       size: 999) // zostaje
+
+        let task = BrowserDataTask(browser: .chrome, dataType: .history, isEnabled: true, isBrowserRunning: { _ in false })
+        let result = await task.run(context: context())
+
+        XCTAssertEqual(result.bytesFreed, 840)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("History").path))
+        XCTAssertTrue (FileManager.default.fileExists(atPath: profile.appendingPathComponent("Bookmarks").path))
+    }
+
+    func test_firefox_history_preserves_places_sqlite_and_deletes_formhistory_downloads() async throws {
+        let profile = tempDir.appendingPathComponent("Library/Application Support/Firefox/Profiles/abc.default")
+        try Fixtures.makeFile(at: profile.appendingPathComponent("places.sqlite"),       size: 9999) // MUSI zostać (bookmarks!)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("formhistory.sqlite"),  size: 700)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("downloads.sqlite"),    size: 200)
+
+        let task = BrowserDataTask(browser: .firefox, dataType: .history, isEnabled: true, isBrowserRunning: { _ in false })
+        let result = await task.run(context: context())
+
+        XCTAssertEqual(result.bytesFreed, 900)
+        XCTAssertTrue (FileManager.default.fileExists(atPath: profile.appendingPathComponent("places.sqlite").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("formhistory.sqlite").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("downloads.sqlite").path))
+    }
 }
