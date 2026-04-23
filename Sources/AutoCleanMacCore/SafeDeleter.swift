@@ -1,7 +1,7 @@
 import Foundation
 
 public final class SafeDeleter {
-    public enum Mode { case live, dryRun }
+    public enum Mode { case live, dryRun, trash }
 
     public enum DeletionError: Error, CustomStringConvertible {
         case outsideAllowedRoot(path: String, root: String)
@@ -43,11 +43,25 @@ public final class SafeDeleter {
             throw DeletionError.notFound(path: path.path)
         }
 
-        let event = mode == .dryRun ? "dryrun" : "delete"
+        let event: String
+        switch mode {
+        case .dryRun: event = "dryrun"
+        case .live:   event = "delete"
+        case .trash:  event = "trash"
+        }
         logger.log(event: event, fields: ["path": path.path, "size": "\(size)"])
 
-        if mode == .live {
+        switch mode {
+        case .dryRun:
+            break
+        case .live:
             try FileManager.default.removeItem(at: path)
+        case .trash:
+            var resulting: NSURL? = nil
+            try FileManager.default.trashItem(at: path, resultingItemURL: &resulting)
+            if let dst = resulting as URL? {
+                logger.log(event: "trash_dst", fields: ["path": path.path, "dst": dst.path])
+            }
         }
         return size
     }

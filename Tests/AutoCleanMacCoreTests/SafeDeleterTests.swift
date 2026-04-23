@@ -107,4 +107,28 @@ final class SafeDeleterTests: XCTestCase {
         let freed = try deleter.delete(dir, withinRoot: root)
         XCTAssertEqual(freed, 1_000)
     }
+
+    func test_trash_mode_moves_file_and_returns_size() throws {
+        let root = tempDir.appendingPathComponent("root")
+        let file = root.appendingPathComponent("doomed.txt")
+        try Fixtures.makeFile(at: file, size: 128)
+        let deleter = SafeDeleter(mode: .trash, logger: logger)
+        let freed = try deleter.delete(file, withinRoot: root)
+        XCTAssertEqual(freed, 128)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    func test_trash_mode_still_rejects_path_outside_root() throws {
+        let root = tempDir.appendingPathComponent("root")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let outside = tempDir.appendingPathComponent("safe.txt")
+        try Fixtures.makeFile(at: outside)
+        let deleter = SafeDeleter(mode: .trash, logger: logger)
+        XCTAssertThrowsError(try deleter.delete(outside, withinRoot: root)) { error in
+            guard case SafeDeleter.DeletionError.outsideAllowedRoot = error else {
+                return XCTFail("Wrong error: \(error)")
+            }
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outside.path))
+    }
 }
