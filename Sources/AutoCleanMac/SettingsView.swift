@@ -70,6 +70,7 @@ private struct BrowsersTab: View {
                                 set: { model.toggle(browser, type, $0) }
                             ))
                             .labelsHidden()
+                            .accessibilityLabel("\(browser.displayName) — \(type.displayName)")
                             .frame(minWidth: 90, alignment: .center)
                         }
                     }
@@ -80,7 +81,7 @@ private struct BrowsersTab: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Label("Ciasteczka = wylogowanie z serwisów.", systemImage: "info.circle")
-                Label("Historia dla Firefoxa czyści tylko autofill i historię pobrań — zakładki bezpieczne (są w tej samej bazie co historia przeglądania, której nie tykamy).", systemImage: "exclamationmark.triangle")
+                Label("Dla Firefoxa „Historia” czyści tylko autofill formularzy i historię pobrań. Historia przeglądania i zakładki pozostają (ta sama baza places.sqlite).", systemImage: "exclamationmark.triangle")
                 Label("Pomijamy przeglądarki które są uruchomione — zamknij je przed sprzątaniem.", systemImage: "info.circle")
             }
             .font(.footnote)

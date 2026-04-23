@@ -20,6 +20,8 @@ public final class CleanupEngine {
         self.tasks = tasks
     }
 
+    public var taskNames: [String] { tasks.map { $0.displayName } }
+
     public func run(context: CleanupContext, onEvent: @escaping (Event) -> Void) async -> Summary {
         onEvent(.started)
         let start = Date()

@@ -36,6 +36,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     cat > "$CONFIG_FILE" <<'JSON'
 {
   "retention_days": 7,
+  "delete_mode": "trash",
   "window": { "fade_in_ms": 800, "hold_after_ms": 3000, "fade_out_ms": 800 },
   "tasks": {
     "user_caches": true,
@@ -43,10 +44,10 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     "trash": true,
     "ds_store": true,
     "user_logs": true,
-    "browser_caches": true,
     "dev_caches": true,
     "downloads": false
-  }
+  },
+  "browsers": {}
 }
 JSON
 else

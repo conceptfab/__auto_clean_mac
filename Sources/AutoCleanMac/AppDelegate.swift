@@ -148,10 +148,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 "trash": true,
                 "ds_store": true,
                 "user_logs": true,
-                "browser_caches": true,
                 "dev_caches": true,
                 "downloads": false
-              }
+              },
+              "browsers": {}
             }
             """
             try? defaultJson.write(to: url, atomically: true, encoding: .utf8)
@@ -174,6 +174,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.settingsWindow?.close()
             } catch {
                 self.logger.log(event: "config_save_failed", fields: ["error": "\(error)"])
+                let alert = NSAlert()
+                alert.messageText = "Nie udało się zapisać preferencji"
+                alert.informativeText = "\(error)"
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                if let win = self.settingsWindow {
+                    alert.beginSheetModal(for: win, completionHandler: nil)
+                } else {
+                    alert.runModal()
+                }
             }
         }
         let host = NSHostingController(rootView: SettingsView(model: model))

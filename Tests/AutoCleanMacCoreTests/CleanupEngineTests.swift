@@ -46,4 +46,25 @@ final class CleanupEngineTests: XCTestCase {
         XCTAssertEqual(names, ["A", "B", "C"])
         if case .summary(let s) = events.last { XCTAssertEqual(s.bytesFreed, 300) } else { XCTFail("no summary event") }
     }
+
+    func test_makeDefault_generates_one_browser_task_per_enabled_type() {
+        var cfg = Config.default
+        // Disable other tasks to make the list easier to reason about
+        cfg.tasks = Config.Tasks(
+            userCaches: false, systemTemp: false, trash: false, dsStore: false,
+            userLogs: false, devCaches: false, downloads: false
+        )
+        cfg.browsers = [
+            .chrome:  BrowserPreferences(types: [.cache, .cookies]),
+            .firefox: BrowserPreferences(types: [.history]),
+        ]
+        let engine = CleanupEngine.makeDefault(config: cfg)
+        let names = engine.taskNames
+        XCTAssertTrue(names.contains("Google Chrome — Cache"))
+        XCTAssertTrue(names.contains("Google Chrome — Ciasteczka"))
+        XCTAssertTrue(names.contains("Firefox — Historia"))
+        // Browser tasks count: 2 (chrome) + 1 (firefox) = 3
+        let browserNames = names.filter { $0.contains("—") }
+        XCTAssertEqual(browserNames.count, 3)
+    }
 }
