@@ -89,4 +89,13 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config.deleteMode, .trash)
         XCTAssertTrue(warnings.contains(where: { $0.contains("delete_mode") }))
     }
+
+    func test_loads_delete_mode_trash_explicit() throws {
+        let file = tempDir.appendingPathComponent("c.json")
+        try #"{ "delete_mode": "trash" }"#.write(to: file, atomically: true, encoding: .utf8)
+        var warnings: [String] = []
+        let config = Config.loadOrDefault(from: file, warn: { warnings.append($0) })
+        XCTAssertEqual(config.deleteMode, .trash)
+        XCTAssertTrue(warnings.isEmpty)
+    }
 }
