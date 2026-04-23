@@ -15,6 +15,21 @@ public enum DeleteMode: String, Equatable {
     }
 }
 
+/// Zestaw typów danych do wyczyszczenia dla jednej przeglądarki.
+public struct BrowserPreferences: Equatable {
+    public var types: Set<BrowserDataType>
+
+    public init(types: Set<BrowserDataType> = []) { self.types = types }
+
+    public static let none = BrowserPreferences(types: [])
+
+    public func contains(_ type: BrowserDataType) -> Bool { types.contains(type) }
+
+    public mutating func set(_ type: BrowserDataType, _ enabled: Bool) {
+        if enabled { types.insert(type) } else { types.remove(type) }
+    }
+}
+
 public struct Config: Equatable {
     public struct Window: Equatable {
         public var fadeInMs: Int
@@ -43,10 +58,13 @@ public struct Config: Equatable {
     public var retentionDays: Int
     public var window: Window
     public var tasks: Tasks
+    public var browsers: [BrowserIdentity: BrowserPreferences]
     public var deleteMode: DeleteMode
 
     public static let `default` = Config(
-        retentionDays: 7, window: .default, tasks: .default, deleteMode: .trash
+        retentionDays: 7, window: .default, tasks: .default,
+        browsers: [:],
+        deleteMode: .trash
     )
 
     public static func loadOrDefault(from url: URL, warn: (String) -> Void) -> Config {
@@ -78,6 +96,29 @@ public struct Config: Equatable {
             if let v = t["dev_caches"]     as? Bool { config.tasks.devCaches     = v }
             if let v = t["downloads"]      as? Bool { config.tasks.downloads     = v }
         }
+        // Legacy: browser_caches: true włącza cache dla wszystkich przeglądarek
+        var browsers: [BrowserIdentity: BrowserPreferences] = [:]
+        if let tasksJson = json["tasks"] as? [String: Any],
+           let legacy = tasksJson["browser_caches"] as? Bool, legacy {
+            for b in BrowserIdentity.allCases {
+                browsers[b] = BrowserPreferences(types: [.cache])
+            }
+        }
+        // Jawna sekcja browsers — nadpisuje legacy per-browser
+        if let browsersJson = json["browsers"] as? [String: Any] {
+            for (key, value) in browsersJson {
+                guard let browser = BrowserIdentity(rawValue: key),
+                      let obj = value as? [String: Any] else { continue }
+                var prefs = BrowserPreferences()
+                for type in BrowserDataType.allCases {
+                    if let enabled = obj[type.rawValue] as? Bool, enabled {
+                        prefs.types.insert(type)
+                    }
+                }
+                browsers[browser] = prefs
+            }
+        }
+        config.browsers = browsers
         if let raw = json["delete_mode"] as? String {
             if let mode = DeleteMode.parse(raw) {
                 config.deleteMode = mode

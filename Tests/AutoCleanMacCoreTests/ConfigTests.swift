@@ -98,4 +98,60 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config.deleteMode, .trash)
         XCTAssertTrue(warnings.isEmpty)
     }
+
+    func test_default_browsers_all_types_off() {
+        let missing = tempDir.appendingPathComponent("nope.json")
+        let config = Config.loadOrDefault(from: missing, warn: { _ in })
+        for browser in BrowserIdentity.allCases {
+            XCTAssertFalse(config.browsers[browser, default: .none].contains(.cache))
+            XCTAssertFalse(config.browsers[browser, default: .none].contains(.cookies))
+            XCTAssertFalse(config.browsers[browser, default: .none].contains(.history))
+        }
+    }
+
+    func test_legacy_browser_caches_true_enables_cache_for_all_browsers() throws {
+        let file = tempDir.appendingPathComponent("c.json")
+        try #"{ "tasks": { "browser_caches": true } }"#.write(to: file, atomically: true, encoding: .utf8)
+        let config = Config.loadOrDefault(from: file, warn: { _ in })
+        for browser in BrowserIdentity.allCases {
+            XCTAssertTrue(config.browsers[browser, default: .none].contains(.cache),
+                          "cache powinno być włączone dla \(browser) przez legacy browser_caches")
+            XCTAssertFalse(config.browsers[browser, default: .none].contains(.cookies))
+        }
+    }
+
+    func test_explicit_browsers_section_takes_precedence() throws {
+        let file = tempDir.appendingPathComponent("c.json")
+        let json = """
+        {
+          "browsers": {
+            "chrome":  { "cache": true,  "cookies": true,  "history": false },
+            "firefox": { "cache": false, "cookies": true,  "history": true  }
+          }
+        }
+        """
+        try json.write(to: file, atomically: true, encoding: .utf8)
+        let config = Config.loadOrDefault(from: file, warn: { _ in })
+        XCTAssertTrue (config.browsers[.chrome]!.contains(.cache))
+        XCTAssertTrue (config.browsers[.chrome]!.contains(.cookies))
+        XCTAssertFalse(config.browsers[.chrome]!.contains(.history))
+        XCTAssertFalse(config.browsers[.firefox]!.contains(.cache))
+        XCTAssertTrue (config.browsers[.firefox]!.contains(.cookies))
+        XCTAssertTrue (config.browsers[.firefox]!.contains(.history))
+        XCTAssertEqual(config.browsers[.edge, default: .none].types, [])
+    }
+
+    func test_explicit_browsers_override_legacy() throws {
+        let file = tempDir.appendingPathComponent("c.json")
+        let json = """
+        {
+          "tasks":   { "browser_caches": true },
+          "browsers": { "chrome": { "cache": false, "cookies": false, "history": false } }
+        }
+        """
+        try json.write(to: file, atomically: true, encoding: .utf8)
+        let config = Config.loadOrDefault(from: file, warn: { _ in })
+        XCTAssertFalse(config.browsers[.chrome, default: .none].contains(.cache))
+        XCTAssertTrue (config.browsers[.firefox, default: .none].contains(.cache))
+    }
 }
