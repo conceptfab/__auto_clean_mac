@@ -85,8 +85,21 @@ public struct BrowserDataTask: CleanupTask {
         case (false, .cache):
             // Firefox cache — pod `.../Firefox/Profiles/<hash>.<name>/cache2/` zarówno w Application Support jak i Caches
             return [profile.appendingPathComponent("cache2")]
-        case (true, .cookies), (false, .cookies), (true, .history), (false, .history):
-            // wypełnione w kolejnych taskach (4, 5)
+        case (true, .cookies):
+            return [
+                profile.appendingPathComponent("Cookies"),
+                profile.appendingPathComponent("Cookies-journal"),
+                profile.appendingPathComponent("Network/Cookies"),          // nowe wersje Chromium
+                profile.appendingPathComponent("Network/Cookies-journal"),
+            ]
+        case (false, .cookies):
+            return [
+                profile.appendingPathComponent("cookies.sqlite"),
+                profile.appendingPathComponent("cookies.sqlite-wal"),
+                profile.appendingPathComponent("cookies.sqlite-shm"),
+            ]
+        case (true, .history), (false, .history):
+            // wypełnione w Tasku 5
             return []
         }
     }

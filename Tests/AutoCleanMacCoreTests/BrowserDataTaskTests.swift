@@ -71,4 +71,46 @@ final class BrowserDataTaskTests: XCTestCase {
         XCTAssertFalse(result.warnings.isEmpty)
         XCTAssertTrue(FileManager.default.fileExists(atPath: profile.path))
     }
+
+    func test_chrome_cookies_deletes_Cookies_and_journal() async throws {
+        let profile = tempDir.appendingPathComponent("Library/Application Support/Google/Chrome/Default")
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Cookies"),         size: 500)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Cookies-journal"), size: 50)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Bookmarks"),       size: 999) // zostaje
+
+        let task = BrowserDataTask(browser: .chrome, dataType: .cookies, isEnabled: true, isBrowserRunning: { _ in false })
+        let result = await task.run(context: context())
+
+        XCTAssertEqual(result.bytesFreed, 550)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("Cookies").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("Cookies-journal").path))
+        XCTAssertTrue (FileManager.default.fileExists(atPath: profile.appendingPathComponent("Bookmarks").path))
+    }
+
+    func test_chrome_cookies_also_deletes_Network_Cookies() async throws {
+        let profile = tempDir.appendingPathComponent("Library/Application Support/Google/Chrome/Default")
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Network/Cookies"),         size: 400)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("Network/Cookies-journal"), size: 30)
+
+        let task = BrowserDataTask(browser: .chrome, dataType: .cookies, isEnabled: true, isBrowserRunning: { _ in false })
+        let result = await task.run(context: context())
+
+        XCTAssertEqual(result.bytesFreed, 430)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("Network/Cookies").path))
+    }
+
+    func test_firefox_cookies_deletes_sqlite_and_wal_shm() async throws {
+        let profile = tempDir.appendingPathComponent("Library/Application Support/Firefox/Profiles/abc.default")
+        try Fixtures.makeFile(at: profile.appendingPathComponent("cookies.sqlite"),     size: 400)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("cookies.sqlite-wal"), size: 30)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("cookies.sqlite-shm"), size: 20)
+        try Fixtures.makeFile(at: profile.appendingPathComponent("places.sqlite"),      size: 9999) // MUSI zostać
+
+        let task = BrowserDataTask(browser: .firefox, dataType: .cookies, isEnabled: true, isBrowserRunning: { _ in false })
+        let result = await task.run(context: context())
+
+        XCTAssertEqual(result.bytesFreed, 450)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("cookies.sqlite").path))
+        XCTAssertTrue (FileManager.default.fileExists(atPath: profile.appendingPathComponent("places.sqlite").path))
+    }
 }
