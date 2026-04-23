@@ -167,7 +167,7 @@ private struct CleanupTab: View {
             Section {
                 Toggle(isOn: $model.tasks.userCaches) {
                     ItemLabel(title: "Cache użytkownika",
-                              detail: "~/Library/Caches")
+                              detail: "Konserwatywne czyszczenie w ~/Library/Caches, z pominięciem aktywnych i chronionych aplikacji")
                 }
                 Toggle(isOn: $model.tasks.systemTemp) {
                     ItemLabel(title: "System Temp",
@@ -196,7 +196,7 @@ private struct CleanupTab: View {
             } header: {
                 Text("Zadania systemowe")
             } footer: {
-                Text("Retencję respektują tylko logi i Downloads. Cache usuwane są od razu.")
+                Text("Retencję respektują tylko logi i Downloads. Cache są czyszczone konserwatywnie: AutoCleanMac pomija aktywne aplikacje oraz wybrane katalogi chronione.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -248,7 +248,7 @@ private struct BrowsersTab: View {
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         ForEach(BrowserDataType.allCases, id: \.self) { type in
-                            Text(type.displayName)
+                            Text(type.settingsColumnTitle)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                                 .frame(width: 80, alignment: .center)
@@ -266,7 +266,8 @@ private struct BrowsersTab: View {
                                     set: { model.toggle(browser, type, $0) }
                                 ))
                                 .labelsHidden()
-                                .accessibilityLabel("\(browser.displayName) — \(type.displayName)")
+                                .accessibilityLabel("\(browser.displayName) — \(type.displayName(for: browser))")
+                                .help(type.helpText(for: browser) ?? "")
                                 .frame(width: 80, alignment: .center)
                             }
                         }
@@ -276,8 +277,8 @@ private struct BrowsersTab: View {
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
                         Label("Ciasteczka = wylogowanie z serwisów.", systemImage: "info.circle")
-                        Label("„Historia” czyści też sesje i faviconsy — bez tego Chromium wraca do ostatnich tabów.", systemImage: "exclamationmark.triangle")
-                        Label("Firefox: historia dzieli bazę z zakładkami (places.sqlite) — jej nie tykamy. Czyścimy autofill i historię pobrań.", systemImage: "exclamationmark.triangle")
+                        Label("„Historia*” czyści też sesje i faviconsy — bez tego Chromium wraca do ostatnich tabów.", systemImage: "exclamationmark.triangle")
+                        Label("Firefox: „Historia*” to bezpieczny wariant. Zachowujemy places.sqlite z zakładkami; czyścimy autofill i historię pobrań.", systemImage: "exclamationmark.triangle")
                         Label("Uruchomione przeglądarki są pomijane — zamknij je przed czyszczeniem.", systemImage: "info.circle")
                     }
                     .font(.footnote)

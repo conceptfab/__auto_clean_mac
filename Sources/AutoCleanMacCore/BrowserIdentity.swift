@@ -89,4 +89,35 @@ public enum BrowserDataType: String, CaseIterable, Equatable, Hashable {
         case .history: return "Historia"
         }
     }
+
+    public var settingsColumnTitle: String {
+        switch self {
+        case .history:
+            return "Historia*"
+        default:
+            return displayName
+        }
+    }
+
+    public func displayName(for browser: BrowserIdentity) -> String {
+        switch (browser, self) {
+        case (.firefox, .history):
+            return "Dane historii*"
+        default:
+            return displayName
+        }
+    }
+
+    public func helpText(for browser: BrowserIdentity) -> String? {
+        switch (browser, self) {
+        case (.firefox, .history):
+            return "Firefox: bezpieczny wariant. Czyści autofill i historię pobrań, ale zachowuje places.sqlite z zakładkami."
+        case (_, .cookies):
+            return "Ciasteczka zwykle wylogowują z serwisów."
+        case (_, .history):
+            return "Czyści ślady przeglądania i dane sesji zgodnie z możliwościami danej przeglądarki."
+        default:
+            return nil
+        }
+    }
 }

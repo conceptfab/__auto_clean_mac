@@ -96,9 +96,35 @@ final class TasksTests: XCTestCase {
         let caches = tempDir.appendingPathComponent("Library/Caches")
         try Fixtures.makeFile(at: caches.appendingPathComponent("a/x.bin"),  size: 100, ageInDays: 0)
         try Fixtures.makeFile(at: caches.appendingPathComponent("b/y.bin"),  size: 200, ageInDays: 30)
-        let task = UserCachesTask(isEnabled: true)
+        let task = UserCachesTask(isEnabled: true, isBundleIDRunning: { _ in false })
         let result = await task.run(context: makeContext())
         XCTAssertEqual(result.bytesFreed, 300)
+    }
+
+    func test_user_caches_skips_protected_top_level_directories() async throws {
+        let caches = tempDir.appendingPathComponent("Library/Caches")
+        try Fixtures.makeFile(at: caches.appendingPathComponent("com.apple.Safari/Cache.db"), size: 120, ageInDays: 30)
+        try Fixtures.makeFile(at: caches.appendingPathComponent("safe.vendor.cache/item.bin"), size: 80, ageInDays: 30)
+
+        let task = UserCachesTask(isEnabled: true, isBundleIDRunning: { _ in false })
+        let result = await task.run(context: makeContext())
+
+        XCTAssertEqual(result.bytesFreed, 80)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: caches.appendingPathComponent("com.apple.Safari/Cache.db").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: caches.appendingPathComponent("safe.vendor.cache/item.bin").path))
+    }
+
+    func test_user_caches_skips_bundle_identifier_for_running_app() async throws {
+        let caches = tempDir.appendingPathComponent("Library/Caches")
+        try Fixtures.makeFile(at: caches.appendingPathComponent("com.example.Editor/cache.bin"), size: 64, ageInDays: 30)
+        try Fixtures.makeFile(at: caches.appendingPathComponent("com.example.Helper/cache.bin"), size: 32, ageInDays: 30)
+
+        let task = UserCachesTask(isEnabled: true, isBundleIDRunning: { $0 == "com.example.Editor" })
+        let result = await task.run(context: makeContext())
+
+        XCTAssertEqual(result.bytesFreed, 32)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: caches.appendingPathComponent("com.example.Editor/cache.bin").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: caches.appendingPathComponent("com.example.Helper/cache.bin").path))
     }
 
     // MARK: - DevCachesTask
