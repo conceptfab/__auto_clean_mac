@@ -76,17 +76,25 @@ final class BrowserIdentityTests: XCTestCase {
         XCTAssertEqual(BrowserDataType.allCases.count, 3)
     }
 
-    func test_isInstalled_false_when_no_profile_root_exists() throws {
-        let tmp = try Fixtures.makeTempDir()
-        defer { try? FileManager.default.removeItem(at: tmp) }
-        XCTAssertFalse(BrowserIdentity.chrome.isInstalled(homeDirectory: tmp))
+    func test_isInstalled_false_when_resolver_returns_nil_for_all_bundle_ids() {
+        XCTAssertFalse(BrowserIdentity.chrome.isInstalled { _ in nil })
     }
 
-    func test_isInstalled_true_when_profile_root_exists() throws {
+    func test_isInstalled_true_when_resolver_returns_url_for_bundle_id() {
+        let fakeAppURL = URL(fileURLWithPath: "/Applications/Google Chrome.app")
+        XCTAssertTrue(BrowserIdentity.chrome.isInstalled { bundleID in
+            bundleID == "com.google.Chrome" ? fakeAppURL : nil
+        })
+    }
+
+    func test_isInstalled_ignores_leftover_profile_folders() throws {
+        // Scenariusz z życia: Chrome odinstalowany ale zostały śmieci w Application Support.
+        // Oczekiwanie: jeśli LaunchServices nie widzi .app, isInstalled == false.
         let tmp = try Fixtures.makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
         let root = tmp.appendingPathComponent("Library/Application Support/Google/Chrome")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        XCTAssertTrue(BrowserIdentity.chrome.isInstalled(homeDirectory: tmp))
+
+        XCTAssertFalse(BrowserIdentity.chrome.isInstalled { _ in nil })
     }
 }

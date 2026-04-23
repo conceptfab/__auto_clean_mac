@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
 
 /// Identyfikator obsługiwanej przeglądarki. Safari celowo pominięte w v1 (wymaga TCC Full Disk Access).
 public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
@@ -33,7 +36,8 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
         }
     }
 
-    /// Bundle identifiery do wykrywania czy przeglądarka jest uruchomiona (NSRunningApplication).
+    /// Bundle identifiery do wykrywania czy przeglądarka jest uruchomiona (NSRunningApplication)
+    /// oraz do znalezienia zainstalowanego .app (LaunchServices).
     public var bundleIdentifiers: [String] {
         switch self {
         case .chrome:  return ["com.google.Chrome"]
@@ -54,9 +58,24 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
         }
     }
 
-    /// True if any of the browser's profile roots exists on disk — lazy way to detect install.
-    public func isInstalled(homeDirectory: URL, fileManager: FileManager = .default) -> Bool {
-        profileRoots(homeDirectory: homeDirectory).contains { fileManager.fileExists(atPath: $0.path) }
+    /// Resolver który dla bundle ID zwraca URL zainstalowanej aplikacji albo nil.
+    public typealias InstallResolver = (String) -> URL?
+
+    /// Domyślny resolver oparty o LaunchServices (NSWorkspace). Znajduje .app niezależnie
+    /// od ścieżki (/Applications, ~/Applications, /Applications/Utilities, …). Na platformach
+    /// bez AppKit zwraca zawsze nil — czyli „nic nie jest zainstalowane”.
+    public static let defaultInstallResolver: InstallResolver = { bundleID in
+        #if canImport(AppKit)
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+        #else
+        return nil
+        #endif
+    }
+
+    /// True iff jakiś bundle identifier tej przeglądarki wskazuje na istniejący .app.
+    /// Świadomie NIE patrzymy na foldery profili — te zostają po deinstalacji i dają fałsz.
+    public func isInstalled(resolver: InstallResolver = BrowserIdentity.defaultInstallResolver) -> Bool {
+        bundleIdentifiers.contains { resolver($0) != nil }
     }
 }
 
