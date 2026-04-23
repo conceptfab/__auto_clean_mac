@@ -45,8 +45,14 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
         }
     }
 
-    /// Czy to silnik Chromium (wspólny layout profili).
-    public var isChromium: Bool { self != .firefox }
+    /// Czy to silnik Chromium (wspólny layout profili). Explicit switch — nowy case enuma
+    /// wymusi jawną decyzję, a nie cichy fallback do true.
+    public var isChromium: Bool {
+        switch self {
+        case .chrome, .edge, .brave, .vivaldi, .arc: return true
+        case .firefox: return false
+        }
+    }
 }
 
 public enum BrowserDataType: String, CaseIterable, Equatable, Hashable {

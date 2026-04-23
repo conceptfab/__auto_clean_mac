@@ -49,4 +49,30 @@ final class BrowserIdentityTests: XCTestCase {
         XCTAssertEqual(BrowserIdentity.vivaldi.bundleIdentifiers, ["com.vivaldi.Vivaldi"])
         XCTAssertEqual(BrowserIdentity.arc.bundleIdentifiers,     ["company.thebrowser.Browser"])
     }
+
+    func test_isChromium_classification() {
+        XCTAssertTrue(BrowserIdentity.chrome.isChromium)
+        XCTAssertTrue(BrowserIdentity.edge.isChromium)
+        XCTAssertTrue(BrowserIdentity.brave.isChromium)
+        XCTAssertTrue(BrowserIdentity.vivaldi.isChromium)
+        XCTAssertTrue(BrowserIdentity.arc.isChromium)
+        XCTAssertFalse(BrowserIdentity.firefox.isChromium)
+    }
+
+    func test_displayNames_are_user_facing_and_stable() {
+        XCTAssertEqual(BrowserIdentity.chrome.displayName,  "Google Chrome")
+        XCTAssertEqual(BrowserIdentity.firefox.displayName, "Firefox")
+        XCTAssertEqual(BrowserIdentity.edge.displayName,    "Microsoft Edge")
+        XCTAssertEqual(BrowserIdentity.brave.displayName,   "Brave")
+        XCTAssertEqual(BrowserIdentity.vivaldi.displayName, "Vivaldi")
+        XCTAssertEqual(BrowserIdentity.arc.displayName,     "Arc")
+        XCTAssertEqual(BrowserDataType.cache.displayName,   "Cache")
+        XCTAssertEqual(BrowserDataType.cookies.displayName, "Ciasteczka")
+        XCTAssertEqual(BrowserDataType.history.displayName, "Historia")
+    }
+
+    func test_allCases_counts_are_stable() {
+        XCTAssertEqual(BrowserIdentity.allCases.count, 6)
+        XCTAssertEqual(BrowserDataType.allCases.count, 3)
+    }
 }
