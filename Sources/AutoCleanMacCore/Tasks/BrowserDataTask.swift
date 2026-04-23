@@ -100,9 +100,19 @@ public struct BrowserDataTask: CleanupTask {
             ]
         case (true, .history):
             return [
+                // Główna baza historii (SQLite)
                 profile.appendingPathComponent("History"),
                 profile.appendingPathComponent("History-journal"),
                 profile.appendingPathComponent("History Provider Cache"),
+                profile.appendingPathComponent("Archived History"),
+                profile.appendingPathComponent("Archived History-journal"),
+                // Faviconsy odwiedzonych stron (SQLite) — jawny ślad "gdzie byłem"
+                profile.appendingPathComponent("Favicons"),
+                profile.appendingPathComponent("Favicons-journal"),
+                // Omnibox autocomplete zbudowany z historii
+                profile.appendingPathComponent("Shortcuts"),
+                profile.appendingPathComponent("Shortcuts-journal"),
+                // Odwiedzone linki (kolor linku w CSS :visited)
                 profile.appendingPathComponent("Visited Links"),
                 profile.appendingPathComponent("Top Sites"),
                 profile.appendingPathComponent("Top Sites-journal"),
