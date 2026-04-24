@@ -145,6 +145,84 @@ final class TasksTests: XCTestCase {
         XCTAssertEqual(result.bytesFreed, 200 + 300 + 150)
     }
 
+    func test_dev_caches_skips_brew_cleanup_when_deletion_mode_is_dry_run() async throws {
+        var didRunBrew = false
+        let task = DevCachesTask(
+            isEnabled: true,
+            runBrew: true,
+            brewExecutable: { "/opt/homebrew/bin/brew" },
+            runBrewProcess: { _, _, _ in
+                didRunBrew = true
+                return DevCachesTask.ProcessOutcome(status: 0, stdout: "freed 1GB", stderr: "", timedOut: false)
+            }
+        )
+        let context = CleanupContext(
+            retentionDays: 7,
+            deleter: SafeDeleter(mode: .dryRun, logger: logger),
+            deletionMode: .dryRun,
+            logger: logger,
+            homeDirectory: tempDir
+        )
+
+        let result = await task.run(context: context)
+
+        XCTAssertFalse(didRunBrew)
+        XCTAssertEqual(result.bytesFreed, 0)
+        XCTAssertTrue(result.warnings.contains { $0.contains("brew cleanup pominięty") })
+    }
+
+    func test_dev_caches_skips_brew_cleanup_when_deletion_mode_is_trash() async throws {
+        var didRunBrew = false
+        let task = DevCachesTask(
+            isEnabled: true,
+            runBrew: true,
+            brewExecutable: { "/opt/homebrew/bin/brew" },
+            runBrewProcess: { _, _, _ in
+                didRunBrew = true
+                return DevCachesTask.ProcessOutcome(status: 0, stdout: "freed 1GB", stderr: "", timedOut: false)
+            }
+        )
+        let context = CleanupContext(
+            retentionDays: 7,
+            deleter: SafeDeleter(mode: .trash, logger: logger),
+            deletionMode: .trash,
+            logger: logger,
+            homeDirectory: tempDir
+        )
+
+        let result = await task.run(context: context)
+
+        XCTAssertFalse(didRunBrew)
+        XCTAssertEqual(result.bytesFreed, 0)
+        XCTAssertTrue(result.warnings.contains { $0.contains("brew cleanup pominięty") })
+    }
+
+    func test_dev_caches_runs_brew_cleanup_when_deletion_mode_is_live() async throws {
+        var receivedArgs: [String] = []
+        let task = DevCachesTask(
+            isEnabled: true,
+            runBrew: true,
+            brewExecutable: { "/opt/homebrew/bin/brew" },
+            runBrewProcess: { _, args, _ in
+                receivedArgs = args
+                return DevCachesTask.ProcessOutcome(status: 0, stdout: "freed 2MB", stderr: "", timedOut: false)
+            }
+        )
+        let context = CleanupContext(
+            retentionDays: 7,
+            deleter: SafeDeleter(mode: .live, logger: logger),
+            deletionMode: .live,
+            logger: logger,
+            homeDirectory: tempDir
+        )
+
+        let result = await task.run(context: context)
+
+        XCTAssertEqual(receivedArgs, ["cleanup", "--prune=7"])
+        XCTAssertEqual(result.bytesFreed, 2 * 1_048_576)
+        XCTAssertTrue(result.warnings.isEmpty)
+    }
+
     // MARK: - DownloadsTask
 
     func test_downloads_deletes_old_files_but_not_hidden_or_dirs() async throws {
@@ -159,6 +237,28 @@ final class TasksTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: dl.appendingPathComponent("recent-notes.txt").path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: dl.appendingPathComponent(".localized").path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: dl.appendingPathComponent("project/file.txt").path))
+    }
+
+    func test_downloads_respects_excluded_paths() async throws {
+        let dl = tempDir.appendingPathComponent("Downloads")
+        let excluded = dl.appendingPathComponent("keep.dmg")
+        try Fixtures.makeFile(at: dl.appendingPathComponent("old-installer.dmg"), size: 500, ageInDays: 30)
+        try Fixtures.makeFile(at: excluded, size: 400, ageInDays: 30)
+        let task = DownloadsTask(isEnabled: true)
+        let context = CleanupContext(
+            retentionDays: 7,
+            deleter: deleter,
+            logger: logger,
+            homeDirectory: tempDir,
+            excludedPaths: [excluded]
+        )
+
+        let result = await task.run(context: context)
+
+        XCTAssertEqual(result.bytesFreed, 500)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dl.appendingPathComponent("old-installer.dmg").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: excluded.path))
+        XCTAssertEqual(result.warnings.count, 1)
     }
 
     func test_downloads_default_off() async throws {

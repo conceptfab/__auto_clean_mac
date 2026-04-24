@@ -4,10 +4,28 @@ public struct DevCachesTask: CleanupTask {
     public let displayName = "Dev caches"
     public let isEnabled: Bool
     private let runBrew: Bool
+    private let brewExecutable: () -> String?
+    private let runBrewProcess: (String, [String], Int) -> ProcessOutcome
 
     public init(isEnabled: Bool, runBrew: Bool = true) {
+        self.init(
+            isEnabled: isEnabled,
+            runBrew: runBrew,
+            brewExecutable: { Self.findExecutable("brew") },
+            runBrewProcess: Self.runProcess
+        )
+    }
+
+    init(
+        isEnabled: Bool,
+        runBrew: Bool,
+        brewExecutable: @escaping () -> String?,
+        runBrewProcess: @escaping (String, [String], Int) -> ProcessOutcome
+    ) {
         self.isEnabled = isEnabled
         self.runBrew = runBrew
+        self.brewExecutable = brewExecutable
+        self.runBrewProcess = runBrewProcess
     }
 
     public func run(context: CleanupContext) async -> TaskResult {
@@ -22,28 +40,42 @@ public struct DevCachesTask: CleanupTask {
         ].filter { context.fileManager.fileExists(atPath: $0.path) }
 
         var freed: Int64 = 0
+        var itemsDeleted = 0
         var warnings: [String] = []
 
         for root in roots {
             for url in FileEnumerator.files(inRoot: root, olderThanDays: context.retentionDays) {
                 do {
-                    freed += try context.deleter.delete(url, withinRoot: root)
+                    let metrics = try context.deleteMeasured(url, withinRoot: root)
+                    freed += metrics.bytesFreed
+                    itemsDeleted += metrics.itemsDeleted
                 } catch {
                     warnings.append("\(url.lastPathComponent): \(error)")
                 }
             }
         }
 
-        if runBrew, let brew = Self.findExecutable("brew") {
+        if runBrew, let brew = brewExecutable() {
+            guard context.deletionMode == .live else {
+                let mode = Self.deletionModeLabel(context.deletionMode)
+                context.logger.log(event: "brew_cleanup_skip", fields: [
+                    "path": brew,
+                    "mode": mode,
+                    "reason": "mode_not_live",
+                ])
+                warnings.append("brew cleanup pominięty w trybie \(mode)")
+                return TaskResult(bytesFreed: freed, itemsDeleted: itemsDeleted, warnings: warnings)
+            }
+
             context.logger.log(event: "brew_cleanup_start", fields: [
                 "path": brew,
                 "prune_days": "\(context.retentionDays)",
             ])
 
-            let outcome = Self.runProcess(
+            let outcome = runBrewProcess(
                 brew,
-                args: ["cleanup", "--prune=\(context.retentionDays)"],
-                timeoutSeconds: 30
+                ["cleanup", "--prune=\(context.retentionDays)"],
+                30
             )
 
             var logFields: [String: String] = [
@@ -67,7 +99,18 @@ public struct DevCachesTask: CleanupTask {
             }
         }
 
-        return TaskResult(bytesFreed: freed, warnings: warnings)
+        return TaskResult(bytesFreed: freed, itemsDeleted: itemsDeleted, warnings: warnings)
+    }
+
+    private static func deletionModeLabel(_ mode: SafeDeleter.Mode) -> String {
+        switch mode {
+        case .dryRun:
+            return "dry_run"
+        case .live:
+            return "live"
+        case .trash:
+            return "trash"
+        }
     }
 
     private static func findExecutable(_ name: String) -> String? {

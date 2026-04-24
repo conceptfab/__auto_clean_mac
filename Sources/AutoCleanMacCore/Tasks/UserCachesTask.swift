@@ -23,17 +23,20 @@ public struct UserCachesTask: CleanupTask {
         }
 
         var freed: Int64 = 0
+        var itemsDeleted = 0
         var warnings: [String] = []
         for candidateRoot in deletionRoots(in: root, context: context) {
             for url in FileEnumerator.files(inRoot: candidateRoot, fileManager: context.fileManager) {
                 do {
-                    freed += try context.deleter.delete(url, withinRoot: candidateRoot)
+                    let metrics = try context.deleteMeasured(url, withinRoot: candidateRoot)
+                    freed += metrics.bytesFreed
+                    itemsDeleted += metrics.itemsDeleted
                 } catch {
                     warnings.append("\(url.lastPathComponent): \(error)")
                 }
             }
         }
-        return TaskResult(bytesFreed: freed, warnings: warnings)
+        return TaskResult(bytesFreed: freed, itemsDeleted: itemsDeleted, warnings: warnings)
     }
 
     private func deletionRoots(in root: URL, context: CleanupContext) -> [URL] {

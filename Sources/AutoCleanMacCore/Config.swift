@@ -15,6 +15,21 @@ public enum DeleteMode: String, Equatable {
     }
 }
 
+public enum ReminderMode: String, Equatable {
+    case off
+    case remind
+    case autoClean
+
+    public static func parse(_ raw: String) -> ReminderMode? {
+        switch raw {
+        case "off": return .off
+        case "remind": return .remind
+        case "auto_clean": return .autoClean
+        default: return nil
+        }
+    }
+}
+
 /// Zestaw typów danych do wyczyszczenia dla jednej przeglądarki.
 public struct BrowserPreferences: Equatable {
     public var types: Set<BrowserDataType>
@@ -31,6 +46,13 @@ public struct BrowserPreferences: Equatable {
 }
 
 public struct Config: Equatable {
+    public struct Reminder: Equatable {
+        public var intervalHours: Int
+        public var mode: ReminderMode
+
+        public static let `default` = Reminder(intervalHours: 24, mode: .remind)
+    }
+
     public struct Window: Equatable {
         public var fadeInMs: Int
         public var holdAfterMs: Int
@@ -46,11 +68,32 @@ public struct Config: Equatable {
         public var dsStore: Bool
         public var userLogs: Bool
         public var devCaches: Bool
+        public var homebrewCleanup: Bool
         public var downloads: Bool
+
+        public init(
+            userCaches: Bool,
+            systemTemp: Bool,
+            trash: Bool,
+            dsStore: Bool,
+            userLogs: Bool,
+            devCaches: Bool,
+            homebrewCleanup: Bool = false,
+            downloads: Bool
+        ) {
+            self.userCaches = userCaches
+            self.systemTemp = systemTemp
+            self.trash = trash
+            self.dsStore = dsStore
+            self.userLogs = userLogs
+            self.devCaches = devCaches
+            self.homebrewCleanup = homebrewCleanup
+            self.downloads = downloads
+        }
 
         public static let `default` = Tasks(
             userCaches: true, systemTemp: true, trash: true, dsStore: true,
-            userLogs: true, devCaches: true, downloads: false
+            userLogs: true, devCaches: true, homebrewCleanup: false, downloads: false
         )
     }
 
@@ -59,11 +102,15 @@ public struct Config: Equatable {
     public var tasks: Tasks
     public var browsers: [BrowserIdentity: BrowserPreferences]
     public var deleteMode: DeleteMode
+    public var reminder: Reminder
+    public var excludedPaths: [String]
 
     public static let `default` = Config(
         retentionDays: 7, window: .default, tasks: .default,
         browsers: [:],
-        deleteMode: .trash
+        deleteMode: .trash,
+        reminder: .default,
+        excludedPaths: []
     )
 
     public static func loadOrDefault(from url: URL, warn: (String) -> Void) -> Config {
@@ -92,6 +139,7 @@ public struct Config: Equatable {
             if let v = t["ds_store"]       as? Bool { config.tasks.dsStore       = v }
             if let v = t["user_logs"]      as? Bool { config.tasks.userLogs      = v }
             if let v = t["dev_caches"]     as? Bool { config.tasks.devCaches     = v }
+            if let v = t["homebrew_cleanup"] as? Bool { config.tasks.homebrewCleanup = v }
             if let v = t["downloads"]      as? Bool { config.tasks.downloads     = v }
         }
         // Legacy: browser_caches: true włącza cache dla wszystkich przeglądarek
@@ -124,6 +172,37 @@ public struct Config: Equatable {
                 warn("Nieznana wartość delete_mode: \"\(raw)\" — używam wartości domyślnej (\(config.deleteMode.rawValue))")
             }
         }
+        if let reminderJson = json["reminder"] as? [String: Any] {
+            if let hours = reminderJson["interval_hours"] as? Int {
+                config.reminder.intervalHours = max(1, hours)
+            }
+            if let raw = reminderJson["mode"] as? String {
+                if let mode = ReminderMode.parse(raw) {
+                    config.reminder.mode = mode
+                } else {
+                    warn("Nieznana wartość reminder.mode: \"\(raw)\" — używam wartości domyślnej (\(config.reminder.mode.rawValue))")
+                }
+            }
+        }
+        if let rawExcludedPaths = json["excluded_paths"] as? [String] {
+            config.excludedPaths = rawExcludedPaths
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        }
         return config
+    }
+
+    public func resolvedExcludedPathURLs(homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) -> [URL] {
+        excludedPaths.map { raw in
+            let path: String
+            if raw == "~" {
+                path = homeDirectory.path
+            } else if raw.hasPrefix("~/") {
+                path = homeDirectory.appendingPathComponent(String(raw.dropFirst(2))).path
+            } else {
+                path = raw
+            }
+            return URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+        }
     }
 }

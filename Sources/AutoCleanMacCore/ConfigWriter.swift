@@ -26,6 +26,7 @@ public enum ConfigWriter {
             "ds_store":       config.tasks.dsStore,
             "user_logs":      config.tasks.userLogs,
             "dev_caches":     config.tasks.devCaches,
+            "homebrew_cleanup": config.tasks.homebrewCleanup,
             "downloads":      config.tasks.downloads,
             // Legacy: zapisujemy false — nowe instalacje używają sekcji browsers poniżej.
             "browser_caches": false,
@@ -47,9 +48,20 @@ public enum ConfigWriter {
         case .dryRun: deleteModeJson = "dry_run"
         }
 
+        let reminderModeJson: String
+        switch config.reminder.mode {
+        case .off:       reminderModeJson = "off"
+        case .remind:    reminderModeJson = "remind"
+        case .autoClean: reminderModeJson = "auto_clean"
+        }
+
         let root: [String: Any] = [
             "retention_days": config.retentionDays,
             "delete_mode":    deleteModeJson,
+            "reminder": [
+                "interval_hours": config.reminder.intervalHours,
+                "mode": reminderModeJson,
+            ],
             "window": [
                 "fade_in_ms":    config.window.fadeInMs,
                 "hold_after_ms": config.window.holdAfterMs,
@@ -57,6 +69,7 @@ public enum ConfigWriter {
             ],
             "tasks":    tasks,
             "browsers": browsers,
+            "excluded_paths": config.excludedPaths,
         ]
 
         let data: Data

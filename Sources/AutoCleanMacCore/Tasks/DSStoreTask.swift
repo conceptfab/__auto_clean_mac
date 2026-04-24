@@ -19,17 +19,20 @@ public struct DSStoreTask: CleanupTask {
             return TaskResult(skipped: true, skipReason: "no roots present")
         }
         var freed: Int64 = 0
+        var itemsDeleted = 0
         var warnings: [String] = []
         for root in roots {
             let files = FileEnumerator.files(inRoot: root, namedExactly: ".DS_Store")
             for url in files {
                 do {
-                    freed += try context.deleter.delete(url, withinRoot: root)
+                    let metrics = try context.deleteMeasured(url, withinRoot: root)
+                    freed += metrics.bytesFreed
+                    itemsDeleted += metrics.itemsDeleted
                 } catch {
                     warnings.append("\(url.path): \(error)")
                 }
             }
         }
-        return TaskResult(bytesFreed: freed, warnings: warnings)
+        return TaskResult(bytesFreed: freed, itemsDeleted: itemsDeleted, warnings: warnings)
     }
 }

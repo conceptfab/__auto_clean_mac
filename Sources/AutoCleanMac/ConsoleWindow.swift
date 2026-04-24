@@ -8,8 +8,9 @@ final class ConsoleWindow: NSObject {
     func showCentered(fadeInMs: Int) {
         let view = ConsoleView(model: model)
         let hosting = NSHostingView(rootView: view)
+        let size = NSSize(width: 600, height: 500)
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 320),
+            contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -28,7 +29,7 @@ final class ConsoleWindow: NSObject {
         visual.wantsLayer = true
         visual.layer?.cornerRadius = 14
         visual.layer?.masksToBounds = true
-        visual.frame = NSRect(x: 0, y: 0, width: 480, height: 320)
+        visual.frame = NSRect(origin: .zero, size: size)
         visual.autoresizingMask = [.width, .height]
 
         hosting.frame = visual.bounds

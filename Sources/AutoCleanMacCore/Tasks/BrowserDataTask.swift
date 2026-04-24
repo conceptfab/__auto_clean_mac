@@ -48,20 +48,23 @@ public struct BrowserDataTask: CleanupTask {
         }
 
         var freed: Int64 = 0
+        var itemsDeleted = 0
         var warnings: [String] = []
         for profilesRoot in roots {
             for profile in listProfileDirs(in: profilesRoot, fileManager: context.fileManager) {
                 let paths = itemsToDelete(in: profile)
                 for url in paths where context.fileManager.fileExists(atPath: url.path) {
                     do {
-                        freed += try context.deleter.delete(url, withinRoot: profile)
+                        let metrics = try context.deleteMeasured(url, withinRoot: profile)
+                        freed += metrics.bytesFreed
+                        itemsDeleted += metrics.itemsDeleted
                     } catch {
                         warnings.append("\(url.lastPathComponent): \(error)")
                     }
                 }
             }
         }
-        return TaskResult(bytesFreed: freed, warnings: warnings)
+        return TaskResult(bytesFreed: freed, itemsDeleted: itemsDeleted, warnings: warnings)
     }
 
     private func listProfileDirs(in root: URL, fileManager: FileManager) -> [URL] {

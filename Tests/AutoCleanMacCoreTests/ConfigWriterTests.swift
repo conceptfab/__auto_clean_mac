@@ -16,11 +16,14 @@ final class ConfigWriterTests: XCTestCase {
         var cfg = Config.default
         cfg.retentionDays = 14
         cfg.deleteMode = .live
+        cfg.reminder = Config.Reminder(intervalHours: 8, mode: .autoClean)
         cfg.browsers = [
             .chrome:  BrowserPreferences(types: [.cache, .cookies]),
             .firefox: BrowserPreferences(types: [.history]),
         ]
         cfg.tasks.downloads = true
+        cfg.tasks.homebrewCleanup = true
+        cfg.excludedPaths = ["~/Downloads/Praca", "/tmp/keep"]
 
         let file = tempDir.appendingPathComponent("out.json")
         try ConfigWriter.write(cfg, to: file)
@@ -28,7 +31,11 @@ final class ConfigWriterTests: XCTestCase {
         let reloaded = Config.loadOrDefault(from: file, warn: { _ in })
         XCTAssertEqual(reloaded.retentionDays, 14)
         XCTAssertEqual(reloaded.deleteMode, .live)
+        XCTAssertEqual(reloaded.reminder.intervalHours, 8)
+        XCTAssertEqual(reloaded.reminder.mode, .autoClean)
         XCTAssertTrue(reloaded.tasks.downloads)
+        XCTAssertTrue(reloaded.tasks.homebrewCleanup)
+        XCTAssertEqual(reloaded.excludedPaths, ["~/Downloads/Praca", "/tmp/keep"])
         XCTAssertEqual(reloaded.browsers[.chrome]?.types,  [.cache, .cookies])
         XCTAssertEqual(reloaded.browsers[.firefox]?.types, [.history])
         XCTAssertNil(reloaded.browsers[.edge])
@@ -62,6 +69,7 @@ final class ConfigWriterTests: XCTestCase {
         var cfg = Config.default
         cfg.retentionDays = 21
         cfg.deleteMode = .trash
+        cfg.reminder = Config.Reminder(intervalHours: 48, mode: .off)
         cfg.window = Config.Window(fadeInMs: 500, holdAfterMs: 2500, fadeOutMs: 600)
         cfg.tasks = Config.Tasks(
             userCaches: false,
@@ -70,6 +78,7 @@ final class ConfigWriterTests: XCTestCase {
             dsStore: true,
             userLogs: false,
             devCaches: true,
+            homebrewCleanup: true,
             downloads: true
         )
         cfg.browsers = [

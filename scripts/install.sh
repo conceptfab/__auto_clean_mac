@@ -11,6 +11,7 @@ APP_DEST="$INSTALL_DIR/$APP_NAME.app"
 LAUNCH_AGENT="$HOME/Library/LaunchAgents/$BUNDLE_ID.plist"
 CONFIG_DIR="$HOME/.config/autoclean-mac"
 CONFIG_FILE="$CONFIG_DIR/config.json"
+AUTOSTART_DISABLED_MARKER="$CONFIG_DIR/launch_at_login.disabled"
 LOGS_DIR="$HOME/Library/Logs/AutoCleanMac"
 
 if ! xcode-select -p >/dev/null 2>&1; then
@@ -37,7 +38,9 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 {
   "retention_days": 7,
   "delete_mode": "trash",
+  "reminder": { "interval_hours": 24, "mode": "remind" },
   "window": { "fade_in_ms": 800, "hold_after_ms": 3000, "fade_out_ms": 800 },
+  "excluded_paths": [],
   "tasks": {
     "user_caches": true,
     "system_temp": true,
@@ -45,6 +48,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     "ds_store": true,
     "user_logs": true,
     "dev_caches": true,
+    "homebrew_cleanup": false,
     "downloads": false
   },
   "browsers": {}
@@ -54,15 +58,21 @@ else
     echo "→ config exists at $CONFIG_FILE (leaving untouched)"
 fi
 
-echo "→ installing LaunchAgent"
-mkdir -p "$(dirname "$LAUNCH_AGENT")"
-sed \
-    -e "s|__APP_BINARY__|$APP_DEST/Contents/MacOS/$APP_NAME|g" \
-    -e "s|__LOGS_DIR__|$LOGS_DIR|g" \
-    "$REPO_ROOT/resources/com.micz.autocleanmac.plist.template" > "$LAUNCH_AGENT"
+if [[ -f "$AUTOSTART_DISABLED_MARKER" ]]; then
+    echo "→ LaunchAgent disabled in preferences, skipping autostart install"
+    launchctl unload "$LAUNCH_AGENT" 2>/dev/null || true
+    rm -f "$LAUNCH_AGENT"
+else
+    echo "→ installing LaunchAgent"
+    mkdir -p "$(dirname "$LAUNCH_AGENT")"
+    sed \
+        -e "s|__APP_BINARY__|$APP_DEST/Contents/MacOS/$APP_NAME|g" \
+        -e "s|__LOGS_DIR__|$LOGS_DIR|g" \
+        "$REPO_ROOT/resources/com.micz.autocleanmac.plist.template" > "$LAUNCH_AGENT"
 
-launchctl unload "$LAUNCH_AGENT" 2>/dev/null || true
-launchctl load -w "$LAUNCH_AGENT"
+    launchctl unload "$LAUNCH_AGENT" 2>/dev/null || true
+    launchctl load -w "$LAUNCH_AGENT"
+fi
 
 echo ""
 echo "✓ AutoCleanMac zainstalowany."

@@ -29,8 +29,8 @@ final class CleanupEngineTests: XCTestCase {
             homeDirectory: tempDir
         )
         let engine = CleanupEngine(tasks: [
-            StubTask(displayName: "A", isEnabled: true, result: TaskResult(bytesFreed: 100)),
-            StubTask(displayName: "B", isEnabled: true, result: TaskResult(bytesFreed: 200, warnings: ["w"])),
+            StubTask(displayName: "A", isEnabled: true, result: TaskResult(bytesFreed: 100, itemsDeleted: 2)),
+            StubTask(displayName: "B", isEnabled: true, result: TaskResult(bytesFreed: 200, itemsDeleted: 3, warnings: ["w"])),
             StubTask(displayName: "C", isEnabled: false, result: TaskResult()),
         ])
 
@@ -38,13 +38,19 @@ final class CleanupEngineTests: XCTestCase {
         let summary = await engine.run(context: ctx) { events.append($0) }
 
         XCTAssertEqual(summary.bytesFreed, 300)
+        XCTAssertEqual(summary.itemsDeleted, 5)
         XCTAssertEqual(summary.warningsCount, 1)
         let names = events.compactMap { event -> String? in
             if case .taskFinished(let name, _) = event { return name }
             return nil
         }
         XCTAssertEqual(names, ["A", "B", "C"])
-        if case .summary(let s) = events.last { XCTAssertEqual(s.bytesFreed, 300) } else { XCTFail("no summary event") }
+        if case .summary(let s) = events.last {
+            XCTAssertEqual(s.bytesFreed, 300)
+            XCTAssertEqual(s.itemsDeleted, 5)
+        } else {
+            XCTFail("no summary event")
+        }
     }
 
     func test_makeDefault_generates_one_browser_task_per_enabled_type() {

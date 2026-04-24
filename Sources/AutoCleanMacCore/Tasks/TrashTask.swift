@@ -18,14 +18,17 @@ public struct TrashTask: CleanupTask {
         }
         let candidates = FileEnumerator.files(inRoot: root, olderThanDays: context.retentionDays)
         var freed: Int64 = 0
+        var itemsDeleted = 0
         var warnings: [String] = []
         for url in candidates {
             do {
-                freed += try context.deleter.delete(url, withinRoot: root)
+                let metrics = try context.deleteMeasured(url, withinRoot: root)
+                freed += metrics.bytesFreed
+                itemsDeleted += metrics.itemsDeleted
             } catch {
                 warnings.append("\(url.lastPathComponent): \(error)")
             }
         }
-        return TaskResult(bytesFreed: freed, warnings: warnings)
+        return TaskResult(bytesFreed: freed, itemsDeleted: itemsDeleted, warnings: warnings)
     }
 }

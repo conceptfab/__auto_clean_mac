@@ -20,7 +20,10 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config.retentionDays, 7)
         XCTAssertTrue(config.tasks.userCaches)
         XCTAssertFalse(config.tasks.downloads)
+        XCTAssertFalse(config.tasks.homebrewCleanup)
         XCTAssertEqual(config.window.fadeInMs, 800)
+        XCTAssertEqual(config.reminder.intervalHours, 24)
+        XCTAssertEqual(config.reminder.mode, .remind)
     }
 
     func test_loads_custom_values() throws {
@@ -28,18 +31,38 @@ final class ConfigTests: XCTestCase {
         let json = """
         {
           "retention_days": 14,
+          "reminder": { "interval_hours": 12, "mode": "auto_clean" },
           "window": { "fade_in_ms": 500, "hold_after_ms": 2000, "fade_out_ms": 500 },
-          "tasks": { "downloads": true, "user_caches": false }
+          "excluded_paths": ["~/Downloads/Praca", "  /tmp/keep  ", ""],
+          "tasks": { "downloads": true, "homebrew_cleanup": true, "user_caches": false }
         }
         """
         try json.write(to: file, atomically: true, encoding: .utf8)
         let config = Config.loadOrDefault(from: file, warn: { _ in })
         XCTAssertEqual(config.retentionDays, 14)
+        XCTAssertEqual(config.reminder.intervalHours, 12)
+        XCTAssertEqual(config.reminder.mode, .autoClean)
         XCTAssertEqual(config.window.fadeInMs, 500)
         XCTAssertTrue(config.tasks.downloads)
+        XCTAssertTrue(config.tasks.homebrewCleanup)
         XCTAssertFalse(config.tasks.userCaches)
+        XCTAssertEqual(config.excludedPaths, ["~/Downloads/Praca", "/tmp/keep"])
         // Unspecified keys keep defaults:
         XCTAssertTrue(config.tasks.trash)
+    }
+
+    func test_resolves_excluded_paths_relative_to_home() {
+        var config = Config.default
+        let home = tempDir.appendingPathComponent("home")
+        config.excludedPaths = ["~/Downloads/Praca", "~", "/tmp/keep"]
+
+        let resolved = config.resolvedExcludedPathURLs(homeDirectory: home).map(\.path)
+
+        XCTAssertEqual(resolved, [
+            home.appendingPathComponent("Downloads/Praca").path,
+            home.path,
+            "/tmp/keep",
+        ])
     }
 
     func test_malformed_json_falls_back_to_defaults_and_warns() throws {
@@ -88,6 +111,22 @@ final class ConfigTests: XCTestCase {
         let config = Config.loadOrDefault(from: file, warn: { warnings.append($0) })
         XCTAssertEqual(config.deleteMode, .trash)
         XCTAssertTrue(warnings.contains(where: { $0.contains("delete_mode") }))
+    }
+
+    func test_unknown_reminder_mode_warns_and_keeps_default() throws {
+        let file = tempDir.appendingPathComponent("c.json")
+        try #"{ "reminder": { "mode": "panic_mode" } }"#.write(to: file, atomically: true, encoding: .utf8)
+        var warnings: [String] = []
+        let config = Config.loadOrDefault(from: file, warn: { warnings.append($0) })
+        XCTAssertEqual(config.reminder.mode, .remind)
+        XCTAssertTrue(warnings.contains(where: { $0.contains("reminder.mode") }))
+    }
+
+    func test_reminder_interval_is_clamped_to_at_least_one_hour() throws {
+        let file = tempDir.appendingPathComponent("c.json")
+        try #"{ "reminder": { "interval_hours": 0, "mode": "remind" } }"#.write(to: file, atomically: true, encoding: .utf8)
+        let config = Config.loadOrDefault(from: file, warn: { _ in })
+        XCTAssertEqual(config.reminder.intervalHours, 1)
     }
 
     func test_loads_delete_mode_trash_explicit() throws {

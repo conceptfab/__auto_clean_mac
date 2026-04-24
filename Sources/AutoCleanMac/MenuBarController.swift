@@ -19,7 +19,7 @@ final class MenuBarController: NSObject {
             }
         }
         let menu = NSMenu()
-        menu.addItem(withTitle: "Uruchom teraz",    action: #selector(runNow),      keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Uruchom cleanup",  action: #selector(runNow),      keyEquivalent: "").target = self
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Preferencje…",     action: #selector(openSettings), keyEquivalent: ",").target = self
         menu.addItem(NSMenuItem.separator())

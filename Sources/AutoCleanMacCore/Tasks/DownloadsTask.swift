@@ -26,6 +26,7 @@ public struct DownloadsTask: CleanupTask {
         let now = Date()
         let cutoff = now.addingTimeInterval(TimeInterval(-context.retentionDays * 86_400))
         var freed: Int64 = 0
+        var itemsDeleted = 0
         var warnings: [String] = []
 
         for url in entries {
@@ -33,11 +34,13 @@ public struct DownloadsTask: CleanupTask {
             guard values?.isRegularFile == true else { continue }
             guard let mtime = values?.contentModificationDate, mtime <= cutoff else { continue }
             do {
-                freed += try context.deleter.delete(url, withinRoot: root)
+                let metrics = try context.deleteMeasured(url, withinRoot: root)
+                freed += metrics.bytesFreed
+                itemsDeleted += metrics.itemsDeleted
             } catch {
                 warnings.append("\(url.lastPathComponent): \(error)")
             }
         }
-        return TaskResult(bytesFreed: freed, warnings: warnings)
+        return TaskResult(bytesFreed: freed, itemsDeleted: itemsDeleted, warnings: warnings)
     }
 }
