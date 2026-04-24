@@ -1,7 +1,7 @@
 import Foundation
 
 public struct DownloadsTask: CleanupTask {
-    public let displayName = "Downloads (>retention, opt-in)"
+    public let displayName = "Downloads (>retention, tylko archiwa/instalki)"
     public let isEnabled: Bool
 
     public init(isEnabled: Bool) { self.isEnabled = isEnabled }
@@ -29,10 +29,16 @@ public struct DownloadsTask: CleanupTask {
         var itemsDeleted = 0
         var warnings: [String] = []
 
+        let safeExtensions: Set<String> = ["dmg", "pkg", "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "iso", "exe"]
+
         for url in entries {
             let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .isRegularFileKey])
             guard values?.isRegularFile == true else { continue }
             guard let mtime = values?.contentModificationDate, mtime <= cutoff else { continue }
+            
+            let ext = url.pathExtension.lowercased()
+            guard safeExtensions.contains(ext) else { continue }
+            
             do {
                 let metrics = try context.deleteMeasured(url, withinRoot: root)
                 freed += metrics.bytesFreed

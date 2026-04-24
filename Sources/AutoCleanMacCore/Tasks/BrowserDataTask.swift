@@ -50,17 +50,26 @@ public struct BrowserDataTask: CleanupTask {
         var freed: Int64 = 0
         var itemsDeleted = 0
         var warnings: [String] = []
-        for profilesRoot in roots {
-            for profile in listProfileDirs(in: profilesRoot, fileManager: context.fileManager) {
-                let paths = itemsToDelete(in: profile)
-                for url in paths where context.fileManager.fileExists(atPath: url.path) {
-                    do {
-                        let metrics = try context.deleteMeasured(url, withinRoot: profile)
-                        freed += metrics.bytesFreed
-                        itemsDeleted += metrics.itemsDeleted
-                    } catch {
-                        warnings.append("\(url.lastPathComponent): \(error)")
-                    }
+        
+        var profilesToClean: [URL] = []
+        if browser.hasProfiles {
+            for profilesRoot in roots {
+                profilesToClean.append(contentsOf: listProfileDirs(in: profilesRoot, fileManager: context.fileManager))
+            }
+        } else {
+            // Safari nie ma profili
+            profilesToClean = roots
+        }
+        
+        for profile in profilesToClean {
+            let paths = itemsToDelete(in: profile)
+            for url in paths where context.fileManager.fileExists(atPath: url.path) {
+                do {
+                    let metrics = try context.deleteMeasured(url, withinRoot: profile)
+                    freed += metrics.bytesFreed
+                    itemsDeleted += metrics.itemsDeleted
+                } catch {
+                    warnings.append("\(url.lastPathComponent): \(error)")
                 }
             }
         }
@@ -78,6 +87,26 @@ public struct BrowserDataTask: CleanupTask {
 
     /// Lista konkretnych plików/katalogów do usunięcia w obrębie jednego profilu.
     private func itemsToDelete(in profile: URL) -> [URL] {
+        if browser == .safari {
+            let container = profile.appendingPathComponent("Library/Containers/com.apple.Safari/Data/Library")
+            let safari = profile.appendingPathComponent("Library/Safari")
+            switch dataType {
+            case .cache:
+                return [container.appendingPathComponent("Caches/com.apple.Safari")]
+            case .cookies:
+                return [
+                    container.appendingPathComponent("Cookies/Cookies.binarycookies"),
+                    safari.appendingPathComponent("Cookies.binarycookies")
+                ]
+            case .history:
+                return [
+                    safari.appendingPathComponent("History.db"),
+                    safari.appendingPathComponent("History.db-wal"),
+                    safari.appendingPathComponent("History.db-shm")
+                ]
+            }
+        }
+
         switch (browser.isChromium, dataType) {
         case (true, .cache):
             return [

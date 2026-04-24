@@ -104,13 +104,17 @@ public struct Config: Equatable {
     public var deleteMode: DeleteMode
     public var reminder: Reminder
     public var excludedPaths: [String]
+    public var whitelistedCacheApps: [String]
+    public var globalShortcutEnabled: Bool
 
     public static let `default` = Config(
         retentionDays: 7, window: .default, tasks: .default,
         browsers: [:],
         deleteMode: .trash,
         reminder: .default,
-        excludedPaths: []
+        excludedPaths: [],
+        whitelistedCacheApps: [],
+        globalShortcutEnabled: false
     )
 
     public static func loadOrDefault(from url: URL, warn: (String) -> Void) -> Config {
@@ -188,6 +192,14 @@ public struct Config: Equatable {
             config.excludedPaths = rawExcludedPaths
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
+        }
+        if let rawWhitelisted = json["whitelisted_cache_apps"] as? [String] {
+            config.whitelistedCacheApps = rawWhitelisted
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        }
+        if let enabled = json["global_shortcut_enabled"] as? Bool {
+            config.globalShortcutEnabled = enabled
         }
         return config
     }

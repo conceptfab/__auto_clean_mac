@@ -60,7 +60,10 @@ public final class CleanupEngine {
 public extension CleanupEngine {
     static func makeDefault(config: Config) -> CleanupEngine {
         var all: [CleanupTask] = [
-            UserCachesTask(isEnabled: config.tasks.userCaches),
+            UserCachesTask(
+                isEnabled: config.tasks.userCaches,
+                whitelistedBundleIDs: config.whitelistedCacheApps
+            ),
             SystemTempTask(isEnabled: config.tasks.systemTemp),
             TrashTask(isEnabled: config.tasks.trash),
             DSStoreTask(isEnabled: config.tasks.dsStore),

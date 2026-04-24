@@ -4,13 +4,16 @@ public struct UserCachesTask: CleanupTask {
     public let displayName = "User caches"
     public let isEnabled: Bool
     private let isBundleIDRunning: (String) -> Bool
+    private let whitelistedBundleIDs: Set<String>
 
     public init(
         isEnabled: Bool,
-        isBundleIDRunning: @escaping (String) -> Bool = { AppRunning.isRunning(bundleIdentifier: $0) }
+        isBundleIDRunning: @escaping (String) -> Bool = { AppRunning.isRunning(bundleIdentifier: $0) },
+        whitelistedBundleIDs: [String] = []
     ) {
         self.isEnabled = isEnabled
         self.isBundleIDRunning = isBundleIDRunning
+        self.whitelistedBundleIDs = Set(whitelistedBundleIDs)
     }
 
     public func run(context: CleanupContext) async -> TaskResult {
@@ -68,12 +71,22 @@ public struct UserCachesTask: CleanupTask {
                 continue
             }
 
-            if Self.looksLikeBundleIdentifier(name), isBundleIDRunning(name) {
-                context.logger.log(event: "user_cache_skip", fields: [
-                    "path": child.path,
-                    "reason": "active_bundle_identifier",
-                ])
-                continue
+            if Self.looksLikeBundleIdentifier(name) {
+                if whitelistedBundleIDs.contains(name) {
+                    context.logger.log(event: "user_cache_skip", fields: [
+                        "path": child.path,
+                        "reason": "whitelisted",
+                    ])
+                    continue
+                }
+                
+                if isBundleIDRunning(name) {
+                    context.logger.log(event: "user_cache_skip", fields: [
+                        "path": child.path,
+                        "reason": "active_bundle_identifier",
+                    ])
+                    continue
+                }
             }
 
             roots.append(child)

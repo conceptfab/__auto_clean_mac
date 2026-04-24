@@ -1,0 +1,213 @@
+Building for debugging...
+[0/4] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.11s)
+Test Suite 'All tests' started at 2026-04-24 22:44:15.277.
+Test Suite 'AutoCleanMacPackageTests.xctest' started at 2026-04-24 22:44:15.278.
+Test Suite 'AppStatisticsTests' started at 2026-04-24 22:44:15.278.
+Test Case '-[AutoCleanMacCoreTests.AppStatisticsTests test_recording_keeps_only_recent_run_limit]' started.
+Test Case '-[AutoCleanMacCoreTests.AppStatisticsTests test_recording_keeps_only_recent_run_limit]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.AppStatisticsTests test_recording_updates_totals_and_prepends_recent_run]' started.
+Test Case '-[AutoCleanMacCoreTests.AppStatisticsTests test_recording_updates_totals_and_prepends_recent_run]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.AppStatisticsTests test_store_loads_legacy_statistics_without_recent_runs]' started.
+Test Case '-[AutoCleanMacCoreTests.AppStatisticsTests test_store_loads_legacy_statistics_without_recent_runs]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.AppStatisticsTests test_store_returns_empty_for_malformed_json]' started.
+Test Case '-[AutoCleanMacCoreTests.AppStatisticsTests test_store_returns_empty_for_malformed_json]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.AppStatisticsTests test_store_round_trips_statistics_with_iso_dates]' started.
+Test Case '-[AutoCleanMacCoreTests.AppStatisticsTests test_store_round_trips_statistics_with_iso_dates]' passed (0.001 seconds).
+Test Suite 'AppStatisticsTests' passed at 2026-04-24 22:44:15.283.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.004 (0.005) seconds
+Test Suite 'BrowserDataTaskTests' started at 2026-04-24 22:44:15.283.
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_chrome_cache_deletes_Cache_and_CodeCache_under_each_profile]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_chrome_cache_deletes_Cache_and_CodeCache_under_each_profile]' passed (0.005 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_chrome_cookies_also_deletes_Network_Cookies]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_chrome_cookies_also_deletes_Network_Cookies]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_chrome_cookies_deletes_Cookies_and_journal]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_chrome_cookies_deletes_Cookies_and_journal]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_chrome_history_also_deletes_session_restore_files]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_chrome_history_also_deletes_session_restore_files]' passed (0.004 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_chrome_history_deletes_History_and_journal]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_chrome_history_deletes_History_and_journal]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_disabled_task_skips]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_disabled_task_skips]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_firefox_cookies_deletes_sqlite_and_wal_shm]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_firefox_cookies_deletes_sqlite_and_wal_shm]' passed (0.003 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_firefox_history_preserves_places_sqlite_and_deletes_formhistory_downloads]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_firefox_history_preserves_places_sqlite_and_deletes_formhistory_downloads]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_running_browser_skips_with_warning]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_running_browser_skips_with_warning]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_skips_when_no_profile_root_exists]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserDataTaskTests test_skips_when_no_profile_root_exists]' passed (0.000 seconds).
+Test Suite 'BrowserDataTaskTests' passed at 2026-04-24 22:44:15.306.
+	 Executed 10 tests, with 0 failures (0 unexpected) in 0.023 (0.024) seconds
+Test Suite 'BrowserIdentityTests' started at 2026-04-24 22:44:15.306.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_all_browsers_have_stable_raw_values]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_all_browsers_have_stable_raw_values]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_allCases_counts_are_stable]' started.
+/Users/micz/__DEV__/__auto_clean_mac/Tests/AutoCleanMacCoreTests/BrowserIdentityTests.swift:75: error: -[AutoCleanMacCoreTests.BrowserIdentityTests test_allCases_counts_are_stable] : XCTAssertEqual failed: ("7") is not equal to ("6")
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_allCases_counts_are_stable]' failed (0.010 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_bundle_identifiers_are_stable]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_bundle_identifiers_are_stable]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_chrome_profile_roots_include_default]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_chrome_profile_roots_include_default]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_data_type_raw_values]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_data_type_raw_values]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_displayNames_are_user_facing_and_stable]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_displayNames_are_user_facing_and_stable]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_edge_brave_vivaldi_arc_roots]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_edge_brave_vivaldi_arc_roots]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_firefox_profile_roots_include_app_support_and_caches]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_firefox_profile_roots_include_app_support_and_caches]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_isChromium_classification]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_isChromium_classification]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_isInstalled_false_when_resolver_returns_nil_for_all_bundle_ids]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_isInstalled_false_when_resolver_returns_nil_for_all_bundle_ids]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_isInstalled_ignores_leftover_profile_folders]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_isInstalled_ignores_leftover_profile_folders]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_isInstalled_true_when_resolver_returns_url_for_bundle_id]' started.
+Test Case '-[AutoCleanMacCoreTests.BrowserIdentityTests test_isInstalled_true_when_resolver_returns_url_for_bundle_id]' passed (0.000 seconds).
+Test Suite 'BrowserIdentityTests' failed at 2026-04-24 22:44:15.318.
+	 Executed 12 tests, with 1 failure (0 unexpected) in 0.012 (0.012) seconds
+Test Suite 'CleanupEngineTests' started at 2026-04-24 22:44:15.318.
+Test Case '-[AutoCleanMacCoreTests.CleanupEngineTests test_engine_runs_all_tasks_in_order_and_sums_bytes]' started.
+Test Case '-[AutoCleanMacCoreTests.CleanupEngineTests test_engine_runs_all_tasks_in_order_and_sums_bytes]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.CleanupEngineTests test_makeDefault_generates_one_browser_task_per_enabled_type]' started.
+Test Case '-[AutoCleanMacCoreTests.CleanupEngineTests test_makeDefault_generates_one_browser_task_per_enabled_type]' passed (0.001 seconds).
+Test Suite 'CleanupEngineTests' passed at 2026-04-24 22:44:15.320.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'ConfigTests' started at 2026-04-24 22:44:15.320.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_default_browsers_all_types_off]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_default_browsers_all_types_off]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_default_delete_mode_is_trash]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_default_delete_mode_is_trash]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_default_when_file_missing]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_default_when_file_missing]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_explicit_browsers_override_legacy]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_explicit_browsers_override_legacy]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_explicit_browsers_section_takes_precedence]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_explicit_browsers_section_takes_precedence]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_legacy_browser_caches_true_enables_cache_for_all_browsers]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_legacy_browser_caches_true_enables_cache_for_all_browsers]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_loads_custom_values]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_loads_custom_values]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_loads_delete_mode_dry_run]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_loads_delete_mode_dry_run]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_loads_delete_mode_live]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_loads_delete_mode_live]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_loads_delete_mode_trash_explicit]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_loads_delete_mode_trash_explicit]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_malformed_json_falls_back_to_defaults_and_warns]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_malformed_json_falls_back_to_defaults_and_warns]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_reminder_interval_is_clamped_to_at_least_one_hour]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_reminder_interval_is_clamped_to_at_least_one_hour]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_resolves_excluded_paths_relative_to_home]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_resolves_excluded_paths_relative_to_home]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_unknown_delete_mode_warns_and_keeps_default]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_unknown_delete_mode_warns_and_keeps_default]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_unknown_keys_are_ignored]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_unknown_keys_are_ignored]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_unknown_reminder_mode_warns_and_keeps_default]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigTests test_unknown_reminder_mode_warns_and_keeps_default]' passed (0.000 seconds).
+Test Suite 'ConfigTests' passed at 2026-04-24 22:44:15.328.
+	 Executed 16 tests, with 0 failures (0 unexpected) in 0.007 (0.008) seconds
+Test Suite 'ConfigWriterTests' started at 2026-04-24 22:44:15.328.
+Test Case '-[AutoCleanMacCoreTests.ConfigWriterTests test_full_config_round_trip_equality]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigWriterTests test_full_config_round_trip_equality]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigWriterTests test_round_trip_dry_run_mode_uses_snake_case]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigWriterTests test_round_trip_dry_run_mode_uses_snake_case]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigWriterTests test_round_trip_preserves_delete_mode_retention_and_browsers]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigWriterTests test_round_trip_preserves_delete_mode_retention_and_browsers]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.ConfigWriterTests test_write_creates_parent_dirs_atomically]' started.
+Test Case '-[AutoCleanMacCoreTests.ConfigWriterTests test_write_creates_parent_dirs_atomically]' passed (0.001 seconds).
+Test Suite 'ConfigWriterTests' passed at 2026-04-24 22:44:15.331.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.003 (0.003) seconds
+Test Suite 'LaunchAgentManagerTests' started at 2026-04-24 22:44:15.331.
+Test Case '-[AutoCleanMacTests.LaunchAgentManagerTests test_launchAgentPlist_contains_expected_program_arguments_and_logs]' started.
+Test Case '-[AutoCleanMacTests.LaunchAgentManagerTests test_launchAgentPlist_contains_expected_program_arguments_and_logs]' passed (0.000 seconds).
+Test Suite 'LaunchAgentManagerTests' passed at 2026-04-24 22:44:15.331.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'LoggerTests' started at 2026-04-24 22:44:15.331.
+Test Case '-[AutoCleanMacCoreTests.LoggerTests test_appends_multiple_lines]' started.
+Test Case '-[AutoCleanMacCoreTests.LoggerTests test_appends_multiple_lines]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.LoggerTests test_creates_log_directory_if_missing]' started.
+Test Case '-[AutoCleanMacCoreTests.LoggerTests test_creates_log_directory_if_missing]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.LoggerTests test_writes_line_with_iso_timestamp_and_event]' started.
+Test Case '-[AutoCleanMacCoreTests.LoggerTests test_writes_line_with_iso_timestamp_and_event]' passed (0.001 seconds).
+Test Suite 'LoggerTests' passed at 2026-04-24 22:44:15.333.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'SafeDeleterTests' started at 2026-04-24 22:44:15.333.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_directory_counts_hidden_files]' started.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_directory_counts_hidden_files]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_directory_returns_recursive_size]' started.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_directory_returns_recursive_size]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_file_within_root_removes_and_returns_size]' started.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_file_within_root_removes_and_returns_size]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_nonexistent_file_throws]' started.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_nonexistent_file_throws]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_rejects_path_outside_root]' started.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_rejects_path_outside_root]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_rejects_symlink_escaping_root]' started.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_delete_rejects_symlink_escaping_root]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_dry_run_directory_returns_recursive_size_without_deleting]' started.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_dry_run_directory_returns_recursive_size_without_deleting]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_dry_run_does_not_delete_but_returns_size]' started.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_dry_run_does_not_delete_but_returns_size]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_trash_mode_directory_returns_recursive_size]' started.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_trash_mode_directory_returns_recursive_size]' passed (0.013 seconds).
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_trash_mode_moves_file_and_returns_size]' started.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_trash_mode_moves_file_and_returns_size]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_trash_mode_still_rejects_path_outside_root]' started.
+Test Case '-[AutoCleanMacCoreTests.SafeDeleterTests test_trash_mode_still_rejects_path_outside_root]' passed (0.001 seconds).
+Test Suite 'SafeDeleterTests' passed at 2026-04-24 22:44:15.360.
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.026 (0.027) seconds
+Test Suite 'SmokeTests' started at 2026-04-24 22:44:15.360.
+Test Case '-[AutoCleanMacCoreTests.SmokeTests test_dev_caches_parses_approximate_brew_size]' started.
+Test Case '-[AutoCleanMacCoreTests.SmokeTests test_dev_caches_parses_approximate_brew_size]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.SmokeTests test_dev_caches_returns_nil_when_brew_output_has_no_size]' started.
+Test Case '-[AutoCleanMacCoreTests.SmokeTests test_dev_caches_returns_nil_when_brew_output_has_no_size]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.SmokeTests test_taskresult_defaults]' started.
+Test Case '-[AutoCleanMacCoreTests.SmokeTests test_taskresult_defaults]' passed (0.000 seconds).
+Test Suite 'SmokeTests' passed at 2026-04-24 22:44:15.362.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.001 (0.002) seconds
+Test Suite 'TasksTests' started at 2026-04-24 22:44:15.362.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_dev_caches_deletes_derived_data_and_npm_and_pip]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_dev_caches_deletes_derived_data_and_npm_and_pip]' passed (0.004 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_dev_caches_runs_brew_cleanup_when_deletion_mode_is_live]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_dev_caches_runs_brew_cleanup_when_deletion_mode_is_live]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_dev_caches_skips_brew_cleanup_when_deletion_mode_is_dry_run]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_dev_caches_skips_brew_cleanup_when_deletion_mode_is_dry_run]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_dev_caches_skips_brew_cleanup_when_deletion_mode_is_trash]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_dev_caches_skips_brew_cleanup_when_deletion_mode_is_trash]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_downloads_default_off]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_downloads_default_off]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_downloads_deletes_old_files_but_not_hidden_or_dirs]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_downloads_deletes_old_files_but_not_hidden_or_dirs]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_downloads_respects_excluded_paths]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_downloads_respects_excluded_paths]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_dsstore_deletes_only_dsstore_files]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_dsstore_deletes_only_dsstore_files]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_system_temp_deletes_old_files_only]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_system_temp_deletes_old_files_only]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_trash_deletes_files_older_than_retention]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_trash_deletes_files_older_than_retention]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_trash_skipped_when_disabled]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_trash_skipped_when_disabled]' passed (0.000 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_trash_skipped_when_root_missing]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_trash_skipped_when_root_missing]' passed (0.001 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_user_caches_deletes_all_files_regardless_of_mtime]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_user_caches_deletes_all_files_regardless_of_mtime]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_user_caches_skips_bundle_identifier_for_running_app]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_user_caches_skips_bundle_identifier_for_running_app]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_user_caches_skips_protected_top_level_directories]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_user_caches_skips_protected_top_level_directories]' passed (0.002 seconds).
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_user_logs_deletes_old_files_only]' started.
+Test Case '-[AutoCleanMacCoreTests.TasksTests test_user_logs_deletes_old_files_only]' passed (0.001 seconds).
+Test Suite 'TasksTests' passed at 2026-04-24 22:44:15.385.
+	 Executed 16 tests, with 0 failures (0 unexpected) in 0.023 (0.023) seconds
+Test Suite 'AutoCleanMacPackageTests.xctest' failed at 2026-04-24 22:44:15.385.
+	 Executed 83 tests, with 1 failure (0 unexpected) in 0.103 (0.107) seconds
+Test Suite 'All tests' failed at 2026-04-24 22:44:15.385.
+	 Executed 83 tests, with 1 failure (0 unexpected) in 0.103 (0.108) seconds
+◇ Test run started.
+↳ Testing Library Version: 1743
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

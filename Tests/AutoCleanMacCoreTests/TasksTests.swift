@@ -127,6 +127,23 @@ final class TasksTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: caches.appendingPathComponent("com.example.Helper/cache.bin").path))
     }
 
+    func test_user_caches_skips_whitelisted_bundle_identifiers() async throws {
+        let caches = tempDir.appendingPathComponent("Library/Caches")
+        try Fixtures.makeFile(at: caches.appendingPathComponent("com.spotify.client/cache.bin"), size: 100, ageInDays: 30)
+        try Fixtures.makeFile(at: caches.appendingPathComponent("com.example.other/cache.bin"), size: 50, ageInDays: 30)
+
+        let task = UserCachesTask(
+            isEnabled: true,
+            isBundleIDRunning: { _ in false },
+            whitelistedBundleIDs: ["com.spotify.client"]
+        )
+        let result = await task.run(context: makeContext())
+
+        XCTAssertEqual(result.bytesFreed, 50)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: caches.appendingPathComponent("com.spotify.client/cache.bin").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: caches.appendingPathComponent("com.example.other/cache.bin").path))
+    }
+
     // MARK: - DevCachesTask
 
     func test_dev_caches_deletes_derived_data_and_npm_and_pip() async throws {

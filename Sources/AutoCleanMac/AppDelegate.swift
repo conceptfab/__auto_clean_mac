@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import AutoCleanMacCore
+import UserNotifications
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let openSettingsNotification = Notification.Name("com.micz.autocleanmac.openSettings")
@@ -89,6 +90,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.runCleanup(source: "reminder_auto")
         }
         reminderScheduler?.update(with: config.reminder)
+        
+        if config.globalShortcutEnabled {
+            GlobalShortcutManager.shared.register()
+        }
 
         let menu = MenuBarController()
         menu.onRunNow        = { [weak self] in self?.runCleanup(source: "menu") }
@@ -189,6 +194,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     } catch {
                         self.logger.log(event: "statistics_save_failed", fields: ["error": "\(error)"])
                     }
+                    
+                    if self.launchContext == .launchAgent && summary.bytesFreed > 0 {
+                        self.sendBackgroundCleanupNotification(freed: summary.bytesFreed, items: summary.itemsDeleted)
+                    }
                 }
                 model.currentTask = nil
                 model.subtitle = presentation == .preview
@@ -233,6 +242,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         case .summary:
             break
+        }
+    }
+
+    private func sendBackgroundCleanupNotification(freed: Int64, items: Int) {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { [weak self] granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Czyszczenie zakończone"
+            content.body = "AutoCleanMac zwolnił w tle \(Self.formatBytes(freed)) (usunięto \(items) plików)."
+            content.sound = .default
+            
+            let request = UNNotificationRequest(
+                identifier: "autocleanmac.background.\(UUID().uuidString)",
+                content: content,
+                trigger: nil
+            )
+            center.add(request) { error in
+                if let error {
+                    self?.logger.log(event: "background_notification_failed", fields: ["error": "\(error)"])
+                } else {
+                    self?.logger.log(event: "background_notification_sent")
+                }
+            }
         }
     }
 
@@ -320,6 +353,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               "reminder": { "interval_hours": 24, "mode": "remind" },
               "window": { "fade_in_ms": 800, "hold_after_ms": 3000, "fade_out_ms": 800 },
               "excluded_paths": [],
+              "whitelisted_cache_apps": [],
               "tasks": {
                 "user_caches": true,
                 "system_temp": true,
@@ -352,6 +386,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             self.config = updated
             reminderScheduler?.update(with: updated.reminder)
+            
+            if updated.globalShortcutEnabled {
+                GlobalShortcutManager.shared.register()
+            } else {
+                GlobalShortcutManager.shared.unregister()
+            }
+            
             self.logger.log(event: "config_saved", fields: ["source": "settings"])
             self.settingsWindow?.close()
             return true
@@ -408,7 +449,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self else { return }
                 NSWorkspace.shared.open(self.logsDir)
             },
-            onShowLastLog: { [weak self] in self?.openMostRecentLog() }
+            onShowLastLog: { [weak self] in self?.openMostRecentLog() },
+            onUninstall: { [weak self] apps, mode in
+                guard let self else { return (0, 0) }
+                let deleter = SafeDeleter(mode: mode, logger: self.logger)
+                let fileManager = FileManager.default
+                var freed: Int64 = 0
+                var count = 0
+                
+                for app in apps {
+                    let appRoot = app.url.deletingLastPathComponent()
+                    if let metrics = try? deleter.deleteMeasured(app.url, withinRoot: appRoot) {
+                        freed += metrics.bytesFreed
+                    }
+                    
+                    let libRoot = home.appendingPathComponent("Library")
+                    for leftover in app.leftoverPaths {
+                        if fileManager.fileExists(atPath: leftover.path) {
+                            if let metrics = try? deleter.deleteMeasured(leftover, withinRoot: libRoot) {
+                                freed += metrics.bytesFreed
+                            }
+                        }
+                    }
+                    count += 1
+                }
+                return (freed, count)
+            }
         )
         let host = NSHostingController(rootView: SettingsView(model: model))
         let win = NSWindow(contentViewController: host)

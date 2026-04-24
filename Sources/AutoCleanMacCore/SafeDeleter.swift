@@ -89,7 +89,7 @@ public final class SafeDeleter {
 
     /// Returns the sum of file sizes under `url`, recursing into directories.
     /// Does not follow symlinks to directories (they are sized by their link size via lstat).
-    private static func recursiveMetrics(at url: URL) throws -> DeletionMetrics {
+    public static func recursiveMetrics(at url: URL) throws -> DeletionMetrics {
         let fm = FileManager.default
         let attrs = try fm.attributesOfItem(atPath: url.path)
         let type = attrs[.type] as? FileAttributeType

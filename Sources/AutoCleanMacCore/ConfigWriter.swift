@@ -70,6 +70,8 @@ public enum ConfigWriter {
             "tasks":    tasks,
             "browsers": browsers,
             "excluded_paths": config.excludedPaths,
+            "whitelisted_cache_apps": config.whitelistedCacheApps,
+            "global_shortcut_enabled": config.globalShortcutEnabled
         ]
 
         let data: Data

@@ -5,7 +5,7 @@ import AppKit
 
 /// Identyfikator obsługiwanej przeglądarki. Safari celowo pominięte w v1 (wymaga TCC Full Disk Access).
 public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
-    case chrome, firefox, edge, brave, vivaldi, arc
+    case chrome, firefox, edge, brave, vivaldi, arc, safari
 
     public var displayName: String {
         switch self {
@@ -15,6 +15,7 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
         case .brave:   return "Brave"
         case .vivaldi: return "Vivaldi"
         case .arc:     return "Arc"
+        case .safari:  return "Safari"
         }
     }
 
@@ -33,6 +34,7 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
         case .brave:   return [appSupport.appendingPathComponent("BraveSoftware/Brave-Browser")]
         case .vivaldi: return [appSupport.appendingPathComponent("Vivaldi")]
         case .arc:     return [appSupport.appendingPathComponent("Arc/User Data")]
+        case .safari:  return [homeDirectory] // Safari nie ma klasycznych profili w jednym podkatalogu
         }
     }
 
@@ -46,6 +48,7 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
         case .brave:   return ["com.brave.Browser"]
         case .vivaldi: return ["com.vivaldi.Vivaldi"]
         case .arc:     return ["company.thebrowser.Browser"]
+        case .safari:  return ["com.apple.Safari"]
         }
     }
 
@@ -54,10 +57,15 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
     public var isChromium: Bool {
         switch self {
         case .chrome, .edge, .brave, .vivaldi, .arc: return true
-        case .firefox: return false
+        case .firefox, .safari: return false
+        }    }
+    /// Czy przeglądarka obsługuje wiele profili w podkatalogach.
+    public var hasProfiles: Bool {
+        switch self {
+        case .safari: return false
+        default: return true
         }
     }
-
     /// Resolver który dla bundle ID zwraca URL zainstalowanej aplikacji albo nil.
     public typealias InstallResolver = (String) -> URL?
 
@@ -112,6 +120,8 @@ public enum BrowserDataType: String, CaseIterable, Equatable, Hashable {
         switch (browser, self) {
         case (.firefox, .history):
             return "Firefox: bezpieczny wariant. Czyści autofill i historię pobrań, ale zachowuje places.sqlite z zakładkami."
+        case (.safari, _):
+            return "Wymaga Pełnego dostępu do dysku (Full Disk Access) ze względów bezpieczeństwa macOS."
         case (_, .cookies):
             return "Ciasteczka zwykle wylogowują z serwisów."
         case (_, .history):
