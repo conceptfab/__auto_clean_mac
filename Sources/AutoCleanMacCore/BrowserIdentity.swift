@@ -5,7 +5,7 @@ import AppKit
 
 /// Identyfikator obsługiwanej przeglądarki. Safari celowo pominięte w v1 (wymaga TCC Full Disk Access).
 public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
-    case chrome, firefox, edge, brave, vivaldi, arc, safari
+    case chrome, firefox, edge, brave, vivaldi, arc, safari, comet
 
     public var displayName: String {
         switch self {
@@ -16,6 +16,7 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
         case .vivaldi: return "Vivaldi"
         case .arc:     return "Arc"
         case .safari:  return "Safari"
+        case .comet:   return "Comet"
         }
     }
 
@@ -35,6 +36,10 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
         case .vivaldi: return [appSupport.appendingPathComponent("Vivaldi")]
         case .arc:     return [appSupport.appendingPathComponent("Arc/User Data")]
         case .safari:  return [homeDirectory] // Safari nie ma klasycznych profili w jednym podkatalogu
+        case .comet:   return [
+            appSupport.appendingPathComponent("Comet"),
+            appSupport.appendingPathComponent("Perplexity/Comet")
+        ]
         }
     }
 
@@ -49,6 +54,7 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
         case .vivaldi: return ["com.vivaldi.Vivaldi"]
         case .arc:     return ["company.thebrowser.Browser"]
         case .safari:  return ["com.apple.Safari"]
+        case .comet:   return ["ai.perplexity.comet"]
         }
     }
 
@@ -56,9 +62,10 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
     /// wymusi jawną decyzję, a nie cichy fallback do true.
     public var isChromium: Bool {
         switch self {
-        case .chrome, .edge, .brave, .vivaldi, .arc: return true
+        case .chrome, .edge, .brave, .vivaldi, .arc, .comet: return true
         case .firefox, .safari: return false
-        }    }
+        }
+    }
     /// Czy przeglądarka obsługuje wiele profili w podkatalogach.
     public var hasProfiles: Bool {
         switch self {

@@ -12,6 +12,7 @@ final class BrowserIdentityTests: XCTestCase {
         XCTAssertEqual(BrowserIdentity.vivaldi.rawValue, "vivaldi")
         XCTAssertEqual(BrowserIdentity.arc.rawValue,     "arc")
         XCTAssertEqual(BrowserIdentity.safari.rawValue,  "safari")
+        XCTAssertEqual(BrowserIdentity.comet.rawValue,   "comet")
     }
 
     func test_data_type_raw_values() {
@@ -41,6 +42,8 @@ final class BrowserIdentityTests: XCTestCase {
         XCTAssertTrue(BrowserIdentity.arc.profileRoots(homeDirectory: home)
             .contains(home.appendingPathComponent("Library/Application Support/Arc/User Data")))
         XCTAssertTrue(BrowserIdentity.safari.profileRoots(homeDirectory: home).contains(home))
+        XCTAssertTrue(BrowserIdentity.comet.profileRoots(homeDirectory: home)
+            .contains(home.appendingPathComponent("Library/Application Support/Comet")))
     }
 
     func test_bundle_identifiers_are_stable() {
@@ -51,6 +54,7 @@ final class BrowserIdentityTests: XCTestCase {
         XCTAssertEqual(BrowserIdentity.vivaldi.bundleIdentifiers, ["com.vivaldi.Vivaldi"])
         XCTAssertEqual(BrowserIdentity.arc.bundleIdentifiers,     ["company.thebrowser.Browser"])
         XCTAssertEqual(BrowserIdentity.safari.bundleIdentifiers,  ["com.apple.Safari"])
+        XCTAssertEqual(BrowserIdentity.comet.bundleIdentifiers,   ["ai.perplexity.comet"])
     }
 
     func test_isChromium_classification() {
@@ -59,6 +63,7 @@ final class BrowserIdentityTests: XCTestCase {
         XCTAssertTrue(BrowserIdentity.brave.isChromium)
         XCTAssertTrue(BrowserIdentity.vivaldi.isChromium)
         XCTAssertTrue(BrowserIdentity.arc.isChromium)
+        XCTAssertTrue(BrowserIdentity.comet.isChromium)
         XCTAssertFalse(BrowserIdentity.firefox.isChromium)
         XCTAssertFalse(BrowserIdentity.safari.isChromium)
     }
@@ -71,13 +76,14 @@ final class BrowserIdentityTests: XCTestCase {
         XCTAssertEqual(BrowserIdentity.vivaldi.displayName, "Vivaldi")
         XCTAssertEqual(BrowserIdentity.arc.displayName,     "Arc")
         XCTAssertEqual(BrowserIdentity.safari.displayName,  "Safari")
+        XCTAssertEqual(BrowserIdentity.comet.displayName,   "Comet")
         XCTAssertEqual(BrowserDataType.cache.displayName,   "Cache")
         XCTAssertEqual(BrowserDataType.cookies.displayName, "Ciasteczka")
         XCTAssertEqual(BrowserDataType.history.displayName, "Historia")
     }
 
     func test_allCases_counts_are_stable() {
-        XCTAssertEqual(BrowserIdentity.allCases.count, 7)
+        XCTAssertEqual(BrowserIdentity.allCases.count, 8)
         XCTAssertEqual(BrowserDataType.allCases.count, 3)
     }
 
