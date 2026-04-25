@@ -79,7 +79,8 @@ public final class AppScanner: Sendable {
         }
         
         #if canImport(AppKit)
-        let icon = await MainActor.run { NSWorkspace.shared.icon(forFile: url.path) }
+        struct IconResult: @unchecked Sendable { let icon: NSImage }
+        let icon = await MainActor.run { IconResult(icon: NSWorkspace.shared.icon(forFile: url.path)) }.icon
         #endif
         
         #if canImport(AppKit)
