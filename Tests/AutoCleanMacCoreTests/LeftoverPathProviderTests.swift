@@ -88,4 +88,38 @@ final class LeftoverPathProviderTests: XCTestCase {
         XCTAssertTrue(paths.contains(agents.appendingPathComponent("com.example.MyApp.helper.plist").path))
         XCTAssertFalse(paths.contains(agents.appendingPathComponent("com.unrelated.helper.plist").path))
     }
+
+    func test_systemPaths_returns_static_candidates() {
+        let root = URL(fileURLWithPath: "/")
+        let paths = LeftoverPathProvider.systemPaths(
+            bundleID: "com.example.MyApp",
+            displayName: "MyApp",
+            systemRoot: root
+        ).map(\.path)
+        XCTAssertTrue(paths.contains("/Library/Preferences/com.example.MyApp.plist"))
+        XCTAssertTrue(paths.contains("/Library/Application Support/com.example.MyApp"))
+        XCTAssertTrue(paths.contains("/Library/Application Support/MyApp"))
+        XCTAssertTrue(paths.contains("/Library/LaunchDaemons/com.example.MyApp.plist"))
+        XCTAssertTrue(paths.contains("/Library/LaunchAgents/com.example.MyApp.plist"))
+        XCTAssertTrue(paths.contains("/Library/PrivilegedHelperTools/com.example.MyApp"))
+    }
+
+    func test_resolveDynamicSystem_finds_helper_variants() throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("SystemFake-\(UUID().uuidString)")
+        let daemons = temp.appendingPathComponent("Library/LaunchDaemons")
+        try FileManager.default.createDirectory(at: daemons, withIntermediateDirectories: true)
+        try Data().write(to: daemons.appendingPathComponent("com.example.MyApp.plist"))
+        try Data().write(to: daemons.appendingPathComponent("com.example.MyApp.privilegedhelper.plist"))
+        try Data().write(to: daemons.appendingPathComponent("com.unrelated.plist"))
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let resolved = LeftoverPathProvider.resolveDynamicSystem(
+            bundleID: "com.example.MyApp",
+            systemRoot: temp
+        ).map(\.path)
+        XCTAssertTrue(resolved.contains(daemons.appendingPathComponent("com.example.MyApp.plist").path))
+        XCTAssertTrue(resolved.contains(daemons.appendingPathComponent("com.example.MyApp.privilegedhelper.plist").path))
+        XCTAssertFalse(resolved.contains(daemons.appendingPathComponent("com.unrelated.plist").path))
+    }
 }

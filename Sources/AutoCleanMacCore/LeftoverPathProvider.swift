@@ -71,3 +71,53 @@ extension LeftoverPathProvider {
         return results
     }
 }
+
+extension LeftoverPathProvider {
+    public static func systemPaths(
+        bundleID: String,
+        displayName: String?,
+        systemRoot: URL = URL(fileURLWithPath: "/")
+    ) -> [URL] {
+        let lib = systemRoot.appendingPathComponent("Library")
+        var paths: [URL] = [
+            lib.appendingPathComponent("Preferences/\(bundleID).plist"),
+            lib.appendingPathComponent("Application Support/\(bundleID)"),
+            lib.appendingPathComponent("LaunchDaemons/\(bundleID).plist"),
+            lib.appendingPathComponent("LaunchAgents/\(bundleID).plist"),
+            lib.appendingPathComponent("PrivilegedHelperTools/\(bundleID)"),
+        ]
+        if let name = displayName, !name.isEmpty, name != bundleID {
+            paths.append(lib.appendingPathComponent("Application Support/\(name)"))
+        }
+        return paths
+    }
+
+    public static func resolveDynamicSystem(
+        bundleID: String,
+        systemRoot: URL = URL(fileURLWithPath: "/")
+    ) -> [URL] {
+        let fm = FileManager.default
+        let lib = systemRoot.appendingPathComponent("Library")
+        var results: [URL] = []
+
+        for sub in ["LaunchDaemons", "LaunchAgents"] {
+            let dir = lib.appendingPathComponent(sub)
+            if let entries = try? fm.contentsOfDirectory(atPath: dir.path) {
+                for name in entries where name.hasSuffix(".plist") {
+                    let stem = String(name.dropLast(".plist".count))
+                    if stem == bundleID || stem.hasPrefix("\(bundleID).") {
+                        results.append(dir.appendingPathComponent(name))
+                    }
+                }
+            }
+        }
+
+        let helpers = lib.appendingPathComponent("PrivilegedHelperTools")
+        if let entries = try? fm.contentsOfDirectory(atPath: helpers.path) {
+            for name in entries where name == bundleID || name.hasPrefix("\(bundleID).") {
+                results.append(helpers.appendingPathComponent(name))
+            }
+        }
+        return results
+    }
+}
