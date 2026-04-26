@@ -62,7 +62,14 @@ public final class AppScanner: Sendable {
             ?? bundle.infoDictionary?["CFBundleName"] as? String
             ?? url.deletingPathExtension().lastPathComponent
             
-        let leftovers = generateLeftoverPaths(for: bundleID, homeDirectory: homeDirectory)
+        let leftovers = LeftoverPathProvider.userPaths(
+            bundleID: bundleID,
+            displayName: name,
+            homeDirectory: homeDirectory
+        ) + LeftoverPathProvider.resolveDynamic(
+            bundleID: bundleID,
+            homeDirectory: homeDirectory
+        )
         
         var appSize: Int64 = 0
         if let metrics = try? SafeDeleter.recursiveMetrics(at: url) {
@@ -103,19 +110,5 @@ public final class AppScanner: Sendable {
             leftoversSize: leftoversSize
         )
         #endif
-    }
-    
-    private func generateLeftoverPaths(for bundleID: String, homeDirectory: URL) -> [URL] {
-        let lib = homeDirectory.appendingPathComponent("Library")
-        return [
-            lib.appendingPathComponent("Application Support/\(bundleID)"),
-            lib.appendingPathComponent("Caches/\(bundleID)"),
-            lib.appendingPathComponent("Preferences/\(bundleID).plist"),
-            lib.appendingPathComponent("Saved Application State/\(bundleID).savedState"),
-            lib.appendingPathComponent("Containers/\(bundleID)"),
-            lib.appendingPathComponent("HTTPStorages/\(bundleID)"),
-            lib.appendingPathComponent("Logs/\(bundleID)"),
-            lib.appendingPathComponent("WebKit/\(bundleID)")
-        ]
     }
 }
