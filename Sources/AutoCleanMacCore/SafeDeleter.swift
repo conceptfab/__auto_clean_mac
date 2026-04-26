@@ -27,7 +27,7 @@ public final class SafeDeleter {
         }
     }
 
-    private let mode: Mode
+    public let mode: Mode
     private let logger: Logger
 
     public init(mode: Mode, logger: Logger) {
