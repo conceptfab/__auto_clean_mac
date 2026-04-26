@@ -54,6 +54,10 @@ public final class AppPurger: Sendable {
 
         let appRoot = appURL.deletingLastPathComponent()
         var appRemoved = false
+        // Measure before attempting delete — NSFileManager.removeItem removes contents
+        // before the directory itself, so if it fails on the parent rmdir the contents
+        // are already gone and a post-failure measurement would return 0.
+        let preDeleteMetrics = try? SafeDeleter.recursiveMetrics(at: appURL)
         do {
             let metrics = try deleter.deleteMeasured(appURL, withinRoot: appRoot)
             bytes += metrics.bytesFreed
@@ -61,7 +65,7 @@ public final class AppPurger: Sendable {
             appRemoved = true
         } catch {
             if fm.fileExists(atPath: appURL.path), deleter.mode != .dryRun {
-                let measured = (try? SafeDeleter.recursiveMetrics(at: appURL).bytesFreed) ?? 0
+                let measured = preDeleteMetrics?.bytesFreed ?? 0
                 do {
                     try await elevatedRemove(appURL)
                     if !fm.fileExists(atPath: appURL.path) {
