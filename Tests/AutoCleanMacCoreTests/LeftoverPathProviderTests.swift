@@ -23,4 +23,25 @@ final class LeftoverPathProviderTests: XCTestCase {
         XCTAssertTrue(asStrings.contains("/Users/test/Library/Cookies/com.example.MyApp.binarycookies"))
         XCTAssertTrue(asStrings.contains("/Users/test/Library/Application Scripts/com.example.MyApp"))
     }
+
+    func test_userPaths_includes_display_name_variants_when_provided() {
+        let paths = LeftoverPathProvider.userPaths(
+            bundleID: "com.example.MyApp",
+            displayName: "MyApp",
+            homeDirectory: home
+        )
+        let asStrings = paths.map(\.path)
+        XCTAssertTrue(asStrings.contains("/Users/test/Library/Application Support/MyApp"))
+        XCTAssertTrue(asStrings.contains("/Users/test/Library/Caches/MyApp"))
+    }
+
+    func test_userPaths_skips_display_name_when_equal_to_bundle_id() {
+        let paths = LeftoverPathProvider.userPaths(
+            bundleID: "com.example.MyApp",
+            displayName: "com.example.MyApp",
+            homeDirectory: home
+        )
+        let appSupport = paths.filter { $0.path.hasSuffix("/Application Support/com.example.MyApp") }
+        XCTAssertEqual(appSupport.count, 1, "Nie duplikuj display-name jeśli to ten sam string co bundle ID")
+    }
 }
