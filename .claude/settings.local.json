@@ -62,7 +62,16 @@
       "Bash(python3 -m json.tool)",
       "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac worktree list)",
       "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac log --oneline -1 main)",
-      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac log --oneline -1 origin/main)"
+      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac log --oneline -1 origin/main)",
+      "mcp__plugin_claude-mem_mcp-search__smart_outline",
+      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac add Sources/AutoCleanMacCore/AppScanner.swift)",
+      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac commit -m \"refactor\\(core\\): AppScanner uses LeftoverPathProvider for leftovers\")",
+      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac add Sources/AutoCleanMacCore/PreferencesDaemonClient.swift Sources/AutoCleanMacCore/LaunchAgentClient.swift)",
+      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac commit -m \"feat\\(core\\): add PreferencesDaemonClient and LaunchAgentClient protocols\")",
+      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac add Sources/AutoCleanMacCore/PreferencesDaemonClient.swift Sources/AutoCleanMacCore/LaunchAgentClient.swift Tests/AutoCleanMacCoreTests/AppPurgerTests.swift)",
+      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac commit -m ' *)",
+      "Bash(git -C /Users/micz/__DEV__/__auto_clean_mac add Sources/AutoCleanMacCore/AppPurger.swift Sources/AutoCleanMacCore/SafeDeleter.swift Tests/AutoCleanMacCoreTests/AppPurgerTests.swift)",
+      "Bash(swift -e ' *)"
     ]
   }
 }

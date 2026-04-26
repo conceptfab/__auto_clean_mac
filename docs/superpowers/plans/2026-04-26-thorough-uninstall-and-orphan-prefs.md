@@ -2,6 +2,40 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## 📌 Execution Status (paused 2026-04-26 po Task 3.2)
+
+**Branch:** `next` | **Mode:** subagent-driven-development | **Wykonane: 10/15 tasków** | **Test count: 95 passing, 0 failures**
+
+| Task | Status |
+|---|---|
+| 1.1 LeftoverPathProvider basic user paths | ✅ done (cda83db) |
+| 1.2 Display-name variants | ✅ done (d927f62) |
+| 1.3 ByHost + Group Containers | ✅ done (e020cf4) |
+| 1.4 LaunchAgents user-side | ✅ done (e9f007a) |
+| 1.5 System paths + resolveDynamicSystem | ✅ done (c948f77) |
+| 1.6 AppScanner uses LeftoverPathProvider | ✅ done (d120055) |
+| 2.1 Daemon client protocols | ✅ done (8fdf91b) |
+| 2.2 Production shell clients | ✅ done (dd5cfe1) |
+| 3.1 AppPurger orchestrator | ✅ done (d32ecb0) |
+| 3.2 AppPurger elevation + prefs tests | ✅ done (c91b826) |
+| 4.1 Wire AppPurger into AppDelegate | ⏸️ pending (next up) |
+| 5.1 InstalledAppRegistry | ⏸️ pending |
+| 6.1 OrphanScanner | ⏸️ pending |
+| 7.x OrphanCleanerTab + wiring | ⏸️ pending |
+| 8.1 Final E2E validation | ⏸️ pending |
+
+### Notatki dla wznowienia
+
+**Logger API:** plan podaje `Logger(directoryURL:)` — faktyczne API to `try Logger(directory:)`. Stosować skorygowaną sygnaturę.
+
+**Bug fix w AppPurger (commit c91b826):** `NSFileManager.removeItem` na katalogu rekursywnie usuwa zawartość przed próbą `rmdir`. Gdy `rmdir` failed (no perms), katalog jest pusty → `recursiveMetrics` w catch zwracał 0. Naprawione: pre-measurement PRZED `deleteMeasured`. Już w commicie, nic nie trzeba robić.
+
+**Concern testowy:** `test_purge_falls_back_to_elevated_on_permission_error` używa chmod 555 na katalogu rodzica — w środowisku root (CI/Docker) test by przeszedł, ale assercja na `elevatedCalls` nie. Lokalnie OK.
+
+**Wznowienie:** w nowej sesji powiedz „wznów plan deinstalacji i sierot" → przeczytam ten banner i ruszę od Task 4.1. Skill: `superpowers:subagent-driven-development`.
+
+---
+
 **Goal:** (1) Wzbogacić deinstalację o pełne usuwanie preferencji aplikacji (ByHost, group containers, cookies, LaunchAgents, system-side `/Library/...`, plus `defaults delete` i `launchctl unload`); (2) dodać skaner "osieroconych" preferencji — plików w `~/Library`/`Library` należących do aplikacji, których już nie ma w `/Applications` ani `~/Applications` — z UI do przeglądu i czyszczenia.
 
 **Architecture:** Wyciągnąć pure-funkcyjne reguły generowania ścieżek z `AppScanner` do nowego `LeftoverPathProvider`. Stworzyć `AppPurger` w Core orkiestrujący usuwanie (pliki + cfprefsd + launchctl), z wstrzykiwanymi protokołami `PreferencesDaemonClient` i `LaunchAgentClient` aby był testowalny. Reużyć `LeftoverPathProvider` w nowym `OrphanScanner`, który dla każdego zainstalowanego bundle ID pyta `InstalledAppRegistry`. Wszystko Core → testy XCTest. UI: jedna nowa zakładka `OrphanCleanerTab` w `SettingsView`.
