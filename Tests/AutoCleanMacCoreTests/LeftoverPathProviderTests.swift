@@ -44,4 +44,31 @@ final class LeftoverPathProviderTests: XCTestCase {
         let appSupport = paths.filter { $0.path.hasSuffix("/Application Support/com.example.MyApp") }
         XCTAssertEqual(appSupport.count, 1, "Nie duplikuj display-name jeśli to ten sam string co bundle ID")
     }
+
+    func test_resolveByHostAndGroupContainers_finds_matching_files() throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("LeftoverPathProvider-\(UUID().uuidString)")
+        let lib = temp.appendingPathComponent("Library")
+        let byHostDir = lib.appendingPathComponent("Preferences/ByHost")
+        let groupDir = lib.appendingPathComponent("Group Containers")
+        try FileManager.default.createDirectory(at: byHostDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: groupDir, withIntermediateDirectories: true)
+        try Data().write(to: byHostDir.appendingPathComponent("com.example.MyApp.ABCDEF.plist"))
+        try Data().write(to: byHostDir.appendingPathComponent("com.other.thing.XYZ.plist"))
+        try FileManager.default.createDirectory(at: groupDir.appendingPathComponent("group.com.example.MyApp"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: groupDir.appendingPathComponent("ABCD1234.com.example.MyApp"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: groupDir.appendingPathComponent("group.com.unrelated"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let resolved = LeftoverPathProvider.resolveDynamic(
+            bundleID: "com.example.MyApp",
+            homeDirectory: temp
+        )
+        let paths = resolved.map(\.path)
+        XCTAssertTrue(paths.contains(byHostDir.appendingPathComponent("com.example.MyApp.ABCDEF.plist").path))
+        XCTAssertFalse(paths.contains(byHostDir.appendingPathComponent("com.other.thing.XYZ.plist").path))
+        XCTAssertTrue(paths.contains(groupDir.appendingPathComponent("group.com.example.MyApp").path))
+        XCTAssertTrue(paths.contains(groupDir.appendingPathComponent("ABCD1234.com.example.MyApp").path))
+        XCTAssertFalse(paths.contains(groupDir.appendingPathComponent("group.com.unrelated").path))
+    }
 }

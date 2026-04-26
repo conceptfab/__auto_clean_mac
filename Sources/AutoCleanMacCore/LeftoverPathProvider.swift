@@ -28,3 +28,36 @@ public enum LeftoverPathProvider {
         return paths
     }
 }
+
+extension LeftoverPathProvider {
+    /// Ścieżki, których nie da się statycznie wyliczyć — wymagają enumeracji katalogów
+    /// (np. ByHost preferences z UUID-em hosta, Group Containers z prefiksem teamID).
+    public static func resolveDynamic(
+        bundleID: String,
+        homeDirectory: URL
+    ) -> [URL] {
+        let fm = FileManager.default
+        let lib = homeDirectory.appendingPathComponent("Library")
+        var results: [URL] = []
+
+        let byHost = lib.appendingPathComponent("Preferences/ByHost")
+        if let entries = try? fm.contentsOfDirectory(atPath: byHost.path) {
+            for name in entries where name.hasPrefix("\(bundleID).") && name.hasSuffix(".plist") {
+                results.append(byHost.appendingPathComponent(name))
+            }
+        }
+
+        let groupContainers = lib.appendingPathComponent("Group Containers")
+        if let entries = try? fm.contentsOfDirectory(atPath: groupContainers.path) {
+            for name in entries {
+                let isGroupPrefixed = name == "group.\(bundleID)" || name.hasPrefix("group.\(bundleID).")
+                let isTeamPrefixed = name.hasSuffix(".\(bundleID)") && name.split(separator: ".").count >= 2 && !name.hasPrefix("group.")
+                if isGroupPrefixed || isTeamPrefixed {
+                    results.append(groupContainers.appendingPathComponent(name))
+                }
+            }
+        }
+
+        return results
+    }
+}
