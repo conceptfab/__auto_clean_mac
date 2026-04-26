@@ -58,6 +58,16 @@ extension LeftoverPathProvider {
             }
         }
 
+        let userAgents = lib.appendingPathComponent("LaunchAgents")
+        if let entries = try? fm.contentsOfDirectory(atPath: userAgents.path) {
+            for name in entries where name.hasSuffix(".plist") {
+                let stem = String(name.dropLast(".plist".count))
+                if stem == bundleID || stem.hasPrefix("\(bundleID).") {
+                    results.append(userAgents.appendingPathComponent(name))
+                }
+            }
+        }
+
         return results
     }
 }

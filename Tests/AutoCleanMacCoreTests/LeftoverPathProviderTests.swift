@@ -71,4 +71,21 @@ final class LeftoverPathProviderTests: XCTestCase {
         XCTAssertTrue(paths.contains(groupDir.appendingPathComponent("ABCD1234.com.example.MyApp").path))
         XCTAssertFalse(paths.contains(groupDir.appendingPathComponent("group.com.unrelated").path))
     }
+
+    func test_resolveDynamic_finds_user_launchagents() throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("LeftoverPathProvider-\(UUID().uuidString)")
+        let agents = temp.appendingPathComponent("Library/LaunchAgents")
+        try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+        try Data().write(to: agents.appendingPathComponent("com.example.MyApp.plist"))
+        try Data().write(to: agents.appendingPathComponent("com.example.MyApp.helper.plist"))
+        try Data().write(to: agents.appendingPathComponent("com.unrelated.helper.plist"))
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let resolved = LeftoverPathProvider.resolveDynamic(bundleID: "com.example.MyApp", homeDirectory: temp)
+        let paths = resolved.map(\.path)
+        XCTAssertTrue(paths.contains(agents.appendingPathComponent("com.example.MyApp.plist").path))
+        XCTAssertTrue(paths.contains(agents.appendingPathComponent("com.example.MyApp.helper.plist").path))
+        XCTAssertFalse(paths.contains(agents.appendingPathComponent("com.unrelated.helper.plist").path))
+    }
 }
