@@ -451,29 +451,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onShowLastLog: { [weak self] in self?.openMostRecentLog() },
             onUninstall: { [weak self] apps, mode in
-                guard let self else { return (0, 0) }
+                guard let self else {
+                    return UninstallOutcome(freedBytes: 0, succeeded: 0, failures: [])
+                }
                 let deleter = SafeDeleter(mode: mode, logger: self.logger)
                 let fileManager = FileManager.default
                 var freed: Int64 = 0
-                var count = 0
-                
+                var succeeded = 0
+                var failures: [UninstallFailure] = []
+
                 for app in apps {
                     let appRoot = app.url.deletingLastPathComponent()
-                    if let metrics = try? deleter.deleteMeasured(app.url, withinRoot: appRoot) {
-                        freed += metrics.bytesFreed
-                    }
-                    
-                    let libRoot = home.appendingPathComponent("Library")
-                    for leftover in app.leftoverPaths {
-                        if fileManager.fileExists(atPath: leftover.path) {
-                            if let metrics = try? deleter.deleteMeasured(leftover, withinRoot: libRoot) {
-                                freed += metrics.bytesFreed
+                    var appRemovedBytes: Int64 = 0
+                    var appRemoved = false
+
+                    do {
+                        let metrics = try deleter.deleteMeasured(app.url, withinRoot: appRoot)
+                        appRemovedBytes = metrics.bytesFreed
+                        appRemoved = true
+                    } catch {
+                        let initialReason = (error as NSError).localizedDescription
+                        self.logger.log(event: "uninstall_failed", fields: [
+                            "app": app.name,
+                            "path": app.url.path,
+                            "reason": initialReason,
+                        ])
+
+                        let stillExists = fileManager.fileExists(atPath: app.url.path)
+                        if stillExists, mode != .dryRun {
+                            let measuredBytes = (try? SafeDeleter.recursiveMetrics(at: app.url).bytesFreed) ?? 0
+                            let elevationResult = await self.attemptElevatedRemoval(
+                                app: app,
+                                mode: mode
+                            )
+                            switch elevationResult {
+                            case .success(let usedFallback):
+                                appRemovedBytes = measuredBytes
+                                appRemoved = true
+                                self.logger.log(event: "uninstall_elevated", fields: [
+                                    "app": app.name,
+                                    "path": app.url.path,
+                                    "size": "\(measuredBytes)",
+                                    "mode": "\(mode)",
+                                    "fallback_to_admin_rm": "\(usedFallback)",
+                                ])
+                            case .cancelled:
+                                failures.append(UninstallFailure(
+                                    appName: app.name,
+                                    reason: "Anulowano przez użytkownika."
+                                ))
+                            case .failed(let reason):
+                                failures.append(UninstallFailure(appName: app.name, reason: reason))
                             }
+                        } else {
+                            failures.append(UninstallFailure(appName: app.name, reason: initialReason))
                         }
                     }
-                    count += 1
+
+                    guard appRemoved else { continue }
+                    freed += appRemovedBytes
+                    succeeded += 1
+
+                    let libRoot = home.appendingPathComponent("Library")
+                    for leftover in app.leftoverPaths where fileManager.fileExists(atPath: leftover.path) {
+                        do {
+                            let metrics = try deleter.deleteMeasured(leftover, withinRoot: libRoot)
+                            freed += metrics.bytesFreed
+                        } catch {
+                            self.logger.log(event: "uninstall_leftover_failed", fields: [
+                                "app": app.name,
+                                "path": leftover.path,
+                                "reason": (error as NSError).localizedDescription,
+                            ])
+                        }
+                    }
                 }
-                return (freed, count)
+                return UninstallOutcome(freedBytes: freed, succeeded: succeeded, failures: failures)
             }
         )
         let host = NSHostingController(rootView: SettingsView(model: model))
@@ -486,5 +539,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow = win
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    fileprivate enum ElevatedRemovalResult {
+        case success(usedFallback: Bool)
+        case cancelled
+        case failed(reason: String)
+    }
+
+    /// Próbuje usunąć element z elewacją uprawnień. W trybie .trash najpierw próbuje
+    /// Findera (TCC/Automation), jeśli to zawiedzie z innego powodu niż anulowanie —
+    /// fallback na admin rm. W trybie .live od razu admin rm.
+    fileprivate func attemptElevatedRemoval(
+        app: AppInfo,
+        mode: SafeDeleter.Mode
+    ) async -> ElevatedRemovalResult {
+        let url = app.url
+        let fileManager = FileManager.default
+
+        if mode == .trash {
+            do {
+                try await MainActor.run {
+                    try ElevatedUninstall.trashViaFinder(url)
+                }
+                if !fileManager.fileExists(atPath: url.path) {
+                    return .success(usedFallback: false)
+                }
+            } catch ElevatedUninstallError.userCancelled {
+                return .cancelled
+            } catch {
+                self.logger.log(event: "uninstall_finder_failed", fields: [
+                    "app": app.name,
+                    "reason": "\(error)",
+                ])
+            }
+        }
+
+        do {
+            try await MainActor.run {
+                try ElevatedUninstall.removeWithAdmin(url)
+            }
+        } catch ElevatedUninstallError.userCancelled {
+            return .cancelled
+        } catch let elevErr as ElevatedUninstallError {
+            return .failed(reason: "\(elevErr)")
+        } catch {
+            return .failed(reason: (error as NSError).localizedDescription)
+        }
+
+        if fileManager.fileExists(atPath: url.path) {
+            return .failed(reason: "Plik nadal istnieje po próbie usunięcia.")
+        }
+        return .success(usedFallback: mode == .trash)
     }
 }

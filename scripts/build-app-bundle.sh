@@ -55,6 +55,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<EOF
     <key>LSMinimumSystemVersion</key>          <string>13.0</string>
     <key>LSUIElement</key>                     <true/>
     <key>NSHighResolutionCapable</key>         <true/>
+    <key>NSAppleEventsUsageDescription</key>   <string>AutoCleanMac używa Findera do przeniesienia chronionych aplikacji do Kosza podczas deinstalacji.</string>
 </dict>
 </plist>
 EOF

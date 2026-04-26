@@ -2,6 +2,17 @@ import AppKit
 import SwiftUI
 import AutoCleanMacCore
 
+struct UninstallFailure: Sendable {
+    let appName: String
+    let reason: String
+}
+
+struct UninstallOutcome: Sendable {
+    var freedBytes: Int64
+    var succeeded: Int
+    var failures: [UninstallFailure]
+}
+
 /// Observable model trzymający EDYTOWALNE preferencje.
 final class SettingsModel: ObservableObject {
     @Published var retentionDays: Int
@@ -20,7 +31,7 @@ final class SettingsModel: ObservableObject {
     let onPreview: (Config) -> Void
     let onOpenLogsFolder: () -> Void
     let onShowLastLog: () -> Void
-    let onUninstall: ([AppInfo], SafeDeleter.Mode) async -> (Int64, Int)
+    let onUninstall: ([AppInfo], SafeDeleter.Mode) async -> UninstallOutcome
     let homeDirectory: URL
     private let baseConfig: Config
 
@@ -34,7 +45,7 @@ final class SettingsModel: ObservableObject {
         onPreview: @escaping (Config) -> Void,
         onOpenLogsFolder: @escaping () -> Void,
         onShowLastLog: @escaping () -> Void,
-        onUninstall: @escaping ([AppInfo], SafeDeleter.Mode) async -> (Int64, Int)
+        onUninstall: @escaping ([AppInfo], SafeDeleter.Mode) async -> UninstallOutcome
     ) {
         self.baseConfig = initial
         self.retentionDays = initial.retentionDays

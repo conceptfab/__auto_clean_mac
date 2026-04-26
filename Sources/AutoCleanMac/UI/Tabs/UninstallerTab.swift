@@ -132,7 +132,7 @@ struct UninstallerTab: View {
             // Footer
             HStack {
                 if viewModel.uninstalledCount > 0 {
-                    Text("Usunięto \(viewModel.uninstalledCount) aplikacji. Zwolniono \(Self.bytesFormatter.string(fromByteCount: viewModel.lastFreedBytes)).")
+                    Text("Usunięto \(viewModel.uninstalledCount) aplikacji. Zwolniono \(Self.formatFreed(viewModel.lastFreedBytes)).")
                         .font(.subheadline)
                         .foregroundStyle(.green)
                 } else {
@@ -180,26 +180,44 @@ struct UninstallerTab: View {
         case .trash: safeDeleterMode = .trash
         }
         
-        let (freed, count) = await settingsModel.onUninstall(toUninstall, safeDeleterMode)
-        
-        viewModel.lastFreedBytes = freed
-        viewModel.uninstalledCount = count
+        let outcome = await settingsModel.onUninstall(toUninstall, safeDeleterMode)
+        let attempted = toUninstall.count
+
+        viewModel.lastFreedBytes = outcome.freedBytes
+        viewModel.uninstalledCount = outcome.succeeded
         viewModel.selectedAppIDs.removeAll()
-        
+
         await viewModel.scan()
         viewModel.isUninstalling = false
-        
-        if count > 0 {
-            alertTitle = "Operacja zakończona"
-            if safeDeleterMode == .dryRun {
-                alertMessage = "Symulacja zakończona.\nZwolnionoby \(Self.bytesFormatter.string(fromByteCount: freed)) z \(count) aplikacji."
-            } else {
-                alertMessage = "Pomyślnie usunięto \(count) aplikacji.\nZwolniono \(Self.bytesFormatter.string(fromByteCount: freed))."
-            }
+
+        let freedText = Self.formatFreed(outcome.freedBytes)
+        let failureLines = outcome.failures
+            .prefix(5)
+            .map { "• \($0.appName): \($0.reason)" }
+            .joined(separator: "\n")
+        let extraFailures = max(0, outcome.failures.count - 5)
+        let failureSuffix: String = {
+            guard !outcome.failures.isEmpty else { return "" }
+            let header = "\n\nNie udało się usunąć \(outcome.failures.count) z \(attempted):\n"
+            let tail = extraFailures > 0 ? "\n…oraz \(extraFailures) więcej." : ""
+            return header + failureLines + tail
+        }()
+
+        if outcome.succeeded > 0 {
+            alertTitle = outcome.failures.isEmpty ? "Operacja zakończona" : "Operacja zakończona z błędami"
+            let verb = safeDeleterMode == .dryRun ? "Zwolnionoby" : "Zwolniono"
+            let action = safeDeleterMode == .dryRun ? "Symulacja: usunięto" : "Usunięto"
+            alertMessage = "\(action) \(outcome.succeeded) z \(attempted) aplikacji.\n\(verb) \(freedText).\(failureSuffix)"
         } else {
-            alertTitle = "Uwaga"
-            alertMessage = "Nie usunięto żadnych aplikacji (błąd lub operacja zablokowana)."
+            alertTitle = "Nie usunięto żadnych aplikacji"
+            alertMessage = outcome.failures.isEmpty
+                ? "Operacja została zablokowana."
+                : "Żadna aplikacja nie została usunięta.\(failureSuffix)"
         }
         showingAlert = true
+    }
+
+    private static func formatFreed(_ bytes: Int64) -> String {
+        bytes <= 0 ? "0 KB" : Self.bytesFormatter.string(fromByteCount: bytes)
     }
 }
