@@ -96,16 +96,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             GlobalShortcutManager.shared.register()
         }
 
+        let menu = MenuBarController()
+        menu.onRunNow        = { [weak self] in self?.runCleanup(source: "menu") }
+        menu.onOpenSettings  = { [weak self] in self?.openSettings() }
+        menu.onQuit          = { NSApp.terminate(nil) }
+        menu.install()
+        menuBar = menu
+
         switch launchContext {
         case .launchAgent:
             runCleanup(source: "launch_agent")
         case .manual:
-            let menu = MenuBarController()
-            menu.onRunNow        = { [weak self] in self?.runCleanup(source: "menu") }
-            menu.onOpenSettings  = { [weak self] in self?.openSettings() }
-            menu.onQuit          = { NSApp.terminate(nil) }
-            menu.install()
-            menuBar = menu
             openSettings()
         }
     }
