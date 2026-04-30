@@ -157,7 +157,15 @@ final class TasksTests: XCTestCase {
         let pip = tempDir.appendingPathComponent("Library/Caches/pip")
         try Fixtures.makeFile(at: pip.appendingPathComponent("wheels/a"), size: 150, ageInDays: 30)
 
-        let task = DevCachesTask(isEnabled: true, runBrew: false)
+        let task = DevCachesTask(
+            isEnabled: true,
+            runBrew: false,
+            brewExecutable: { nil },
+            runBrewProcess: { _, _, _ in
+                XCTFail("No native process should run in this filesystem-only test")
+                return DevCachesTask.ProcessOutcome(status: 1, stdout: "", stderr: "", timedOut: false)
+            }
+        )
         let result = await task.run(context: makeContext())
         XCTAssertEqual(result.bytesFreed, 200 + 300 + 150)
     }
@@ -238,6 +246,217 @@ final class TasksTests: XCTestCase {
         XCTAssertEqual(receivedArgs, ["cleanup", "--prune=7"])
         XCTAssertEqual(result.bytesFreed, 2 * 1_048_576)
         XCTAssertTrue(result.warnings.isEmpty)
+    }
+
+    func test_dev_caches_skips_native_cleanup_when_deletion_mode_is_dry_run() async throws {
+        var didRun = false
+        let task = DevCachesTask(
+            isEnabled: true,
+            runBrew: false,
+            brewExecutable: { nil },
+            toolExecutable: { _ in "/usr/bin/tool" },
+            runBrewProcess: { _, _, _ in
+                didRun = true
+                return DevCachesTask.ProcessOutcome(status: 0, stdout: "", stderr: "", timedOut: false)
+            },
+            nativeToolCommands: [
+                DevCachesTask.NativeToolCommand(label: "test cache", executableName: "tool", arguments: ["clean"])
+            ]
+        )
+        let context = CleanupContext(
+            retentionDays: 7,
+            deleter: SafeDeleter(mode: .dryRun, logger: logger),
+            deletionMode: .dryRun,
+            logger: logger,
+            homeDirectory: tempDir
+        )
+
+        let result = await task.run(context: context)
+
+        XCTAssertFalse(didRun)
+        XCTAssertTrue(result.warnings.contains { $0.contains("native devtools cleanup pominięty") })
+    }
+
+    func test_dev_caches_skips_native_cleanup_when_deletion_mode_is_trash() async throws {
+        var didRun = false
+        let task = DevCachesTask(
+            isEnabled: true,
+            runBrew: false,
+            brewExecutable: { nil },
+            toolExecutable: { _ in "/usr/bin/tool" },
+            runBrewProcess: { _, _, _ in
+                didRun = true
+                return DevCachesTask.ProcessOutcome(status: 0, stdout: "", stderr: "", timedOut: false)
+            },
+            nativeToolCommands: [
+                DevCachesTask.NativeToolCommand(label: "test cache", executableName: "tool", arguments: ["clean"])
+            ]
+        )
+        let context = CleanupContext(
+            retentionDays: 7,
+            deleter: SafeDeleter(mode: .trash, logger: logger),
+            deletionMode: .trash,
+            logger: logger,
+            homeDirectory: tempDir
+        )
+
+        let result = await task.run(context: context)
+
+        XCTAssertFalse(didRun)
+        XCTAssertTrue(result.warnings.contains { $0.contains("native devtools cleanup pominięty") })
+    }
+
+    func test_dev_caches_runs_native_cleanup_when_deletion_mode_is_live() async throws {
+        var receivedPath = ""
+        var receivedArgs: [String] = []
+        let task = DevCachesTask(
+            isEnabled: true,
+            runBrew: false,
+            brewExecutable: { nil },
+            toolExecutable: { name in name == "tool" ? "/usr/bin/tool" : nil },
+            runBrewProcess: { path, args, _ in
+                receivedPath = path
+                receivedArgs = args
+                return DevCachesTask.ProcessOutcome(status: 0, stdout: "", stderr: "", timedOut: false)
+            },
+            nativeToolCommands: [
+                DevCachesTask.NativeToolCommand(label: "test cache", executableName: "tool", arguments: ["clean"])
+            ]
+        )
+
+        let result = await task.run(context: makeContext())
+
+        XCTAssertEqual(receivedPath, "/usr/bin/tool")
+        XCTAssertEqual(receivedArgs, ["clean"])
+        XCTAssertTrue(result.warnings.isEmpty)
+    }
+
+    func test_dev_caches_warns_when_native_tool_is_missing() async throws {
+        var didRun = false
+        let task = DevCachesTask(
+            isEnabled: true,
+            runBrew: false,
+            brewExecutable: { nil },
+            toolExecutable: { _ in nil },
+            runBrewProcess: { _, _, _ in
+                didRun = true
+                return DevCachesTask.ProcessOutcome(status: 0, stdout: "", stderr: "", timedOut: false)
+            },
+            nativeToolCommands: [
+                DevCachesTask.NativeToolCommand(label: "test cache", executableName: "tool", arguments: ["clean"])
+            ]
+        )
+
+        let result = await task.run(context: makeContext())
+
+        XCTAssertFalse(didRun)
+        XCTAssertTrue(result.warnings.contains { $0.contains("narzędzie niedostępne") })
+    }
+
+    func test_dev_caches_warns_when_native_cleanup_fails() async throws {
+        let task = DevCachesTask(
+            isEnabled: true,
+            runBrew: false,
+            brewExecutable: { nil },
+            toolExecutable: { _ in "/usr/bin/tool" },
+            runBrewProcess: { _, _, _ in
+                DevCachesTask.ProcessOutcome(status: 42, stdout: "", stderr: "nope", timedOut: false)
+            },
+            nativeToolCommands: [
+                DevCachesTask.NativeToolCommand(label: "test cache", executableName: "tool", arguments: ["clean"])
+            ]
+        )
+
+        let result = await task.run(context: makeContext())
+
+        XCTAssertTrue(result.warnings.contains { $0.contains("test cache exited 42") })
+    }
+
+    // MARK: - ProjectArtifactsTask
+
+    func test_project_artifacts_task_skipped_when_disabled() async throws {
+        let task = ProjectArtifactsTask(isEnabled: false, searchRoots: [tempDir])
+
+        let result = await task.run(context: makeContext())
+
+        XCTAssertTrue(result.skipped)
+        XCTAssertEqual(result.skipReason, "disabled")
+    }
+
+    func test_project_artifacts_deletes_supported_artifacts_only() async throws {
+        let projects = tempDir.appendingPathComponent("Projects")
+        let app = projects.appendingPathComponent("App")
+        try Fixtures.makeFile(at: app.appendingPathComponent(".next/cache/chunk.bin"), size: 100)
+        try Fixtures.makeFile(at: app.appendingPathComponent("__pycache__/main.pyc"), size: 50)
+        try Fixtures.makeFile(at: app.appendingPathComponent(".dart_tool/state.bin"), size: 70)
+        try Fixtures.makeFile(at: app.appendingPathComponent(".pytest_cache/v/cache/nodeids"), size: 30)
+        try Fixtures.makeFile(at: app.appendingPathComponent(".mypy_cache/3.12/mod.json"), size: 40)
+        try Fixtures.makeFile(at: app.appendingPathComponent(".ruff_cache/content"), size: 60)
+        try Fixtures.makeFile(at: app.appendingPathComponent("node_modules/.cache/bundler.bin"), size: 80)
+        try Fixtures.makeFile(at: app.appendingPathComponent("Sources/main.swift"), size: 1_000)
+        try Fixtures.makeFile(at: app.appendingPathComponent("package-lock.json"), size: 1_000)
+        try Fixtures.makeFile(at: app.appendingPathComponent("node_modules/pkg/index.js"), size: 1_000)
+
+        let task = ProjectArtifactsTask(isEnabled: true, searchRoots: [projects])
+        let result = await task.run(context: makeContext())
+
+        XCTAssertEqual(result.bytesFreed, 100 + 50 + 70 + 30 + 40 + 60 + 80)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.appendingPathComponent(".next/cache").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.appendingPathComponent("__pycache__").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.appendingPathComponent("node_modules/.cache").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.appendingPathComponent("Sources/main.swift").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.appendingPathComponent("package-lock.json").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.appendingPathComponent("node_modules/pkg/index.js").path))
+    }
+
+    func test_project_artifacts_skips_empty_pycache_without_bytecode() async throws {
+        let projects = tempDir.appendingPathComponent("Projects")
+        let pycache = projects.appendingPathComponent("App/__pycache__")
+        try Fixtures.makeFile(at: pycache.appendingPathComponent("notes.txt"), size: 100)
+
+        let task = ProjectArtifactsTask(isEnabled: true, searchRoots: [projects])
+        let result = await task.run(context: makeContext())
+
+        XCTAssertEqual(result.bytesFreed, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: pycache.appendingPathComponent("notes.txt").path))
+    }
+
+    func test_project_artifacts_respects_excluded_paths() async throws {
+        let projects = tempDir.appendingPathComponent("Projects")
+        let cache = projects.appendingPathComponent("App/.next/cache")
+        try Fixtures.makeFile(at: cache.appendingPathComponent("chunk.bin"), size: 100)
+        let context = CleanupContext(
+            retentionDays: 7,
+            deleter: deleter,
+            logger: logger,
+            homeDirectory: tempDir,
+            excludedPaths: [projects.appendingPathComponent("App")]
+        )
+
+        let task = ProjectArtifactsTask(isEnabled: true, searchRoots: [projects])
+        let result = await task.run(context: context)
+
+        XCTAssertEqual(result.bytesFreed, 0)
+        XCTAssertTrue(result.warnings.contains { $0.contains("excluded path") })
+        XCTAssertTrue(FileManager.default.fileExists(atPath: cache.appendingPathComponent("chunk.bin").path))
+    }
+
+    func test_project_artifacts_does_not_follow_symlinked_roots_or_candidates_outside_root() async throws {
+        let projects = tempDir.appendingPathComponent("Projects")
+        let outside = tempDir.appendingPathComponent("Outside")
+        try Fixtures.makeFile(at: outside.appendingPathComponent(".next/cache/outside.bin"), size: 100)
+        try FileManager.default.createDirectory(at: projects.appendingPathComponent("App/.next"), withIntermediateDirectories: true)
+        try Fixtures.makeSymlink(
+            at: projects.appendingPathComponent("App/.next/cache"),
+            pointingTo: outside.appendingPathComponent(".next/cache")
+        )
+
+        let task = ProjectArtifactsTask(isEnabled: true, searchRoots: [projects])
+        let result = await task.run(context: makeContext())
+
+        XCTAssertEqual(result.bytesFreed, 0)
+        XCTAssertTrue(result.warnings.contains { $0.contains("escapes root") })
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outside.appendingPathComponent(".next/cache/outside.bin").path))
     }
 
     // MARK: - DownloadsTask

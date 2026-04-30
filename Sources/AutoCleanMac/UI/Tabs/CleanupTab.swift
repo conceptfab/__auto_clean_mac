@@ -26,10 +26,13 @@ struct CleanupTab: View {
                     ItemLabel(title: "Logi użytkownika", detail: "~/Library/Logs (respektuje retencję)")
                 }
                 Toggle(isOn: $model.tasks.devCaches) {
-                    ItemLabel(title: "Cache devtools", detail: "DerivedData, npm, pip")
+                    ItemLabel(title: "Cache devtools", detail: "DerivedData, npm, pip oraz natywne cleanupy narzędzi w trybie live")
                 }
                 Toggle(isOn: $model.tasks.homebrewCleanup) {
                     ItemLabel(title: "Homebrew cleanup", detail: "Uruchamia brew cleanup --prune; tylko w trybie trwałego usuwania")
+                }
+                Toggle(isOn: $model.tasks.projectArtifacts) {
+                    ItemLabel(title: "Artefakty projektów", detail: "Opcjonalne build cache w ~/dev, ~/Developer, ~/Projects i ~/GitHub")
                 }
                 Toggle(isOn: $model.tasks.downloads) {
                     ItemLabel(title: "Downloads", detail: "Pliki starsze niż retencja")
@@ -37,7 +40,7 @@ struct CleanupTab: View {
             } header: {
                 Text("Zadania systemowe")
             } footer: {
-                Text("Retencję respektują logi, Downloads, temp i cache devtools. Homebrew cleanup jest osobnym, bardziej agresywnym krokiem i nie działa w trybie Kosza ani podglądu.")
+                Text("Retencję respektują logi, Downloads, temp i cache devtools. Homebrew i natywne cleanupy devtools działają tylko w trybie trwałego usuwania; artefakty projektów są domyślnie wyłączone.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

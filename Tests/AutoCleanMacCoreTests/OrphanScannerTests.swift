@@ -6,8 +6,12 @@ final class OrphanScannerTests: XCTestCase {
         let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Orphan-\(UUID().uuidString)")
         let prefs = temp.appendingPathComponent("Library/Preferences")
         try FileManager.default.createDirectory(at: prefs, withIntermediateDirectories: true)
-        try Data(repeating: 1, count: 200).write(to: prefs.appendingPathComponent("com.dead.app.plist"))
-        try Data(repeating: 1, count: 200).write(to: prefs.appendingPathComponent("com.alive.app.plist"))
+        let deadPref = prefs.appendingPathComponent("com.dead.app.plist")
+        let alivePref = prefs.appendingPathComponent("com.alive.app.plist")
+        try Data(repeating: 1, count: 200).write(to: deadPref)
+        try Data(repeating: 1, count: 200).write(to: alivePref)
+        try makeOld(deadPref)
+        try makeOld(alivePref)
         defer { try? FileManager.default.removeItem(at: temp) }
 
         let scanner = OrphanScanner()
@@ -24,8 +28,11 @@ final class OrphanScannerTests: XCTestCase {
         let support = temp.appendingPathComponent("Library/Application Support/com.dead.app")
         try FileManager.default.createDirectory(at: prefs, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
-        try Data(repeating: 1, count: 100).write(to: prefs.appendingPathComponent("com.dead.app.plist"))
+        let deadPref = prefs.appendingPathComponent("com.dead.app.plist")
+        try Data(repeating: 1, count: 100).write(to: deadPref)
         try Data(repeating: 1, count: 50).write(to: support.appendingPathComponent("data.bin"))
+        try makeOld(deadPref)
+        try makeOld(support)
         defer { try? FileManager.default.removeItem(at: temp) }
 
         let orphans = OrphanScanner().scan(homeDirectory: temp, installedBundleIDs: [])
@@ -44,5 +51,43 @@ final class OrphanScannerTests: XCTestCase {
 
         let orphans = OrphanScanner().scan(homeDirectory: temp, installedBundleIDs: [])
         XCTAssertTrue(orphans.isEmpty)
+    }
+
+    func test_scan_skips_recent_candidates() throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Orphan-\(UUID().uuidString)")
+        let prefs = temp.appendingPathComponent("Library/Preferences")
+        try FileManager.default.createDirectory(at: prefs, withIntermediateDirectories: true)
+        try Data(repeating: 1, count: 200).write(to: prefs.appendingPathComponent("com.dead.app.plist"))
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let orphans = OrphanScanner().scan(homeDirectory: temp, installedBundleIDs: [])
+
+        XCTAssertTrue(orphans.isEmpty)
+    }
+
+    func test_scan_skips_risky_generic_orphan_roots() throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Orphan-\(UUID().uuidString)")
+        let lib = temp.appendingPathComponent("Library")
+        let launchAgents = lib.appendingPathComponent("LaunchAgents")
+        let containers = lib.appendingPathComponent("Containers/com.dead.app")
+        let scripts = lib.appendingPathComponent("Application Scripts/com.dead.app")
+        try FileManager.default.createDirectory(at: launchAgents, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: containers, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
+        let agent = launchAgents.appendingPathComponent("com.dead.app.plist")
+        try Data(repeating: 1, count: 100).write(to: agent)
+        try makeOld(agent)
+        try makeOld(containers)
+        try makeOld(scripts)
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let orphans = OrphanScanner().scan(homeDirectory: temp, installedBundleIDs: [])
+
+        XCTAssertTrue(orphans.isEmpty)
+    }
+
+    private func makeOld(_ url: URL) throws {
+        let oldDate = Date(timeIntervalSinceNow: -31 * 24 * 60 * 60)
+        try FileManager.default.setAttributes([.modificationDate: oldDate], ofItemAtPath: url.path)
     }
 }

@@ -5,14 +5,18 @@ public struct DevCachesTask: CleanupTask {
     public let isEnabled: Bool
     private let runBrew: Bool
     private let brewExecutable: () -> String?
+    private let toolExecutable: (String) -> String?
     private let runBrewProcess: (String, [String], Int) -> ProcessOutcome
+    private let nativeToolCommands: [NativeToolCommand]
 
     public init(isEnabled: Bool, runBrew: Bool = true) {
         self.init(
             isEnabled: isEnabled,
             runBrew: runBrew,
             brewExecutable: { Self.findExecutable("brew") },
-            runBrewProcess: Self.runProcess
+            toolExecutable: Self.findExecutable,
+            runBrewProcess: Self.runProcess,
+            nativeToolCommands: Self.defaultNativeToolCommands
         )
     }
 
@@ -20,12 +24,16 @@ public struct DevCachesTask: CleanupTask {
         isEnabled: Bool,
         runBrew: Bool,
         brewExecutable: @escaping () -> String?,
-        runBrewProcess: @escaping (String, [String], Int) -> ProcessOutcome
+        toolExecutable: @escaping (String) -> String? = { _ in nil },
+        runBrewProcess: @escaping (String, [String], Int) -> ProcessOutcome,
+        nativeToolCommands: [NativeToolCommand] = []
     ) {
         self.isEnabled = isEnabled
         self.runBrew = runBrew
         self.brewExecutable = brewExecutable
+        self.toolExecutable = toolExecutable
         self.runBrewProcess = runBrewProcess
+        self.nativeToolCommands = nativeToolCommands
     }
 
     public func run(context: CleanupContext) async -> TaskResult {
@@ -99,7 +107,58 @@ public struct DevCachesTask: CleanupTask {
             }
         }
 
+        if !nativeToolCommands.isEmpty {
+            runNativeToolCleanups(context: context, warnings: &warnings)
+        }
+
         return TaskResult(bytesFreed: freed, itemsDeleted: itemsDeleted, warnings: warnings)
+    }
+
+    private func runNativeToolCleanups(context: CleanupContext, warnings: inout [String]) {
+        let mode = Self.deletionModeLabel(context.deletionMode)
+        guard context.deletionMode == .live else {
+            context.logger.log(event: "dev_tool_cleanup_skip", fields: [
+                "mode": mode,
+                "reason": "mode_not_live",
+            ])
+            warnings.append("native devtools cleanup pominięty w trybie \(mode)")
+            return
+        }
+
+        for command in nativeToolCommands {
+            guard let executable = toolExecutable(command.executableName) else {
+                context.logger.log(event: "dev_tool_cleanup_missing", fields: [
+                    "tool": command.executableName,
+                    "label": command.label,
+                ])
+                warnings.append("\(command.label) pominięty: narzędzie niedostępne")
+                continue
+            }
+
+            context.logger.log(event: "dev_tool_cleanup_start", fields: [
+                "tool": command.executableName,
+                "path": executable,
+                "label": command.label,
+            ])
+            let outcome = runBrewProcess(executable, command.arguments, command.timeoutSeconds)
+            var logFields: [String: String] = [
+                "tool": command.executableName,
+                "label": command.label,
+                "status": "\(outcome.status)",
+                "timed_out": outcome.timedOut ? "true" : "false",
+            ]
+            let outputPreview = Self.logPreview(outcome.combinedOutput)
+            if !outputPreview.isEmpty {
+                logFields["output"] = outputPreview
+            }
+            context.logger.log(event: "dev_tool_cleanup_finish", fields: logFields)
+
+            if outcome.timedOut {
+                warnings.append("\(command.label) timed out after \(command.timeoutSeconds)s")
+            } else if outcome.status != 0 {
+                warnings.append("\(command.label) exited \(outcome.status)")
+            }
+        }
     }
 
     private static func deletionModeLabel(_ mode: SafeDeleter.Mode) -> String {
@@ -133,6 +192,30 @@ public struct DevCachesTask: CleanupTask {
                 .joined(separator: "\n")
         }
     }
+
+    struct NativeToolCommand: Equatable {
+        let label: String
+        let executableName: String
+        let arguments: [String]
+        let timeoutSeconds: Int
+
+        init(label: String, executableName: String, arguments: [String], timeoutSeconds: Int = 30) {
+            self.label = label
+            self.executableName = executableName
+            self.arguments = arguments
+            self.timeoutSeconds = timeoutSeconds
+        }
+    }
+
+    static let defaultNativeToolCommands: [NativeToolCommand] = [
+        NativeToolCommand(label: "npm cache", executableName: "npm", arguments: ["cache", "clean", "--force"]),
+        NativeToolCommand(label: "pnpm store", executableName: "pnpm", arguments: ["store", "prune"]),
+        NativeToolCommand(label: "bun cache", executableName: "bun", arguments: ["pm", "cache", "rm"]),
+        NativeToolCommand(label: "pip cache", executableName: "pip3", arguments: ["cache", "purge"]),
+        NativeToolCommand(label: "Go build cache", executableName: "go", arguments: ["clean", "-cache"]),
+        NativeToolCommand(label: "Go module cache", executableName: "go", arguments: ["clean", "-modcache"]),
+        NativeToolCommand(label: "mise cache", executableName: "mise", arguments: ["cache", "clear"]),
+    ]
 
     static func approximateFreedBytes(from output: String) -> Int64? {
         let pattern = #"freed(?: approximately)? ([0-9]+(?:\.[0-9]+)?)\s*([KMGTP]?B)"#

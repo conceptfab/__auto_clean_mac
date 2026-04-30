@@ -23,6 +23,7 @@ final class ConfigWriterTests: XCTestCase {
         ]
         cfg.tasks.downloads = true
         cfg.tasks.homebrewCleanup = true
+        cfg.tasks.projectArtifacts = true
         cfg.excludedPaths = ["~/Downloads/Praca", "/tmp/keep"]
 
         let file = tempDir.appendingPathComponent("out.json")
@@ -35,6 +36,7 @@ final class ConfigWriterTests: XCTestCase {
         XCTAssertEqual(reloaded.reminder.mode, .autoClean)
         XCTAssertTrue(reloaded.tasks.downloads)
         XCTAssertTrue(reloaded.tasks.homebrewCleanup)
+        XCTAssertTrue(reloaded.tasks.projectArtifacts)
         XCTAssertEqual(reloaded.excludedPaths, ["~/Downloads/Praca", "/tmp/keep"])
         XCTAssertEqual(reloaded.browsers[.chrome]?.types,  [.cache, .cookies])
         XCTAssertEqual(reloaded.browsers[.firefox]?.types, [.history])
@@ -79,6 +81,7 @@ final class ConfigWriterTests: XCTestCase {
             userLogs: false,
             devCaches: true,
             homebrewCleanup: true,
+            projectArtifacts: true,
             downloads: true
         )
         cfg.browsers = [

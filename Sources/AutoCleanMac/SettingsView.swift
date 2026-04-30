@@ -112,6 +112,7 @@ final class SettingsModel: ObservableObject {
             tasks.userLogs,
             tasks.devCaches,
             tasks.homebrewCleanup,
+            tasks.projectArtifacts,
             tasks.downloads,
         ].filter { $0 }.count
     }

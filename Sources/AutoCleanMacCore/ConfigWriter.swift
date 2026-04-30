@@ -27,6 +27,7 @@ public enum ConfigWriter {
             "user_logs":      config.tasks.userLogs,
             "dev_caches":     config.tasks.devCaches,
             "homebrew_cleanup": config.tasks.homebrewCleanup,
+            "project_artifacts": config.tasks.projectArtifacts,
             "downloads":      config.tasks.downloads,
             // Legacy: zapisujemy false — nowe instalacje używają sekcji browsers poniżej.
             "browser_caches": false,

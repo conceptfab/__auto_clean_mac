@@ -25,13 +25,19 @@ public struct OrphanPath: Sendable, Hashable {
 }
 
 public struct OrphanScanner: Sendable {
+    public let minimumAgeDays: Int
+
     /// Bundle ID prefiksy, których nie raportujemy jako sieroty (system, Apple).
     public static let skippedPrefixes: [String] = [
         "com.apple.",
         ".GlobalPreferences",
+        "GlobalPreferences",
+        "org.cups.",
     ]
 
-    public init() {}
+    public init(minimumAgeDays: Int = 30) {
+        self.minimumAgeDays = max(0, minimumAgeDays)
+    }
 
     public func scan(homeDirectory: URL, installedBundleIDs: Set<String>) -> [OrphanGroup] {
         let lib = homeDirectory.appendingPathComponent("Library")
@@ -40,7 +46,6 @@ public struct OrphanScanner: Sendable {
         // Skanowane lokalizacje (basename → bundle ID).
         let plistDirs: [(URL, suffix: String)] = [
             (lib.appendingPathComponent("Preferences"), ".plist"),
-            (lib.appendingPathComponent("LaunchAgents"), ".plist"),
             (lib.appendingPathComponent("Cookies"), ".binarycookies"),
         ]
         for (dir, suffix) in plistDirs {
@@ -48,14 +53,14 @@ public struct OrphanScanner: Sendable {
         }
 
         // Katalogi nazwane bundle ID.
+        // Nie skanujemy tu LaunchAgents, Containers, Group Containers ani Application Scripts:
+        // są zbyt ryzykowne jako generic orphan sweep i często dają fałszywe trafienia.
         let dirRoots: [URL] = [
             lib.appendingPathComponent("Application Support"),
             lib.appendingPathComponent("Caches"),
-            lib.appendingPathComponent("Containers"),
             lib.appendingPathComponent("HTTPStorages"),
             lib.appendingPathComponent("Logs"),
             lib.appendingPathComponent("WebKit"),
-            lib.appendingPathComponent("Application Scripts"),
         ]
         for root in dirRoots {
             collectDirectories(in: root, into: &byID, installed: installedBundleIDs)
@@ -82,6 +87,7 @@ public struct OrphanScanner: Sendable {
             let bundleID = bundleIDFromPlistStem(stem)
             guard isCandidateOrphan(bundleID: bundleID, installed: installed) else { continue }
             let url = dir.appendingPathComponent(name)
+            guard isOldEnough(url) else { continue }
             let bytes = (try? SafeDeleter.recursiveMetrics(at: url).bytesFreed) ?? 0
             byID[bundleID, default: []].append(OrphanPath(url: url, bytes: bytes))
         }
@@ -99,6 +105,7 @@ public struct OrphanScanner: Sendable {
             let url = root.appendingPathComponent(name)
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else { continue }
+            guard isOldEnough(url) else { continue }
             let bytes = (try? SafeDeleter.recursiveMetrics(at: url).bytesFreed) ?? 0
             byID[name, default: []].append(OrphanPath(url: url, bytes: bytes))
         }
@@ -114,5 +121,15 @@ public struct OrphanScanner: Sendable {
         guard !bundleID.isEmpty, !bundleID.hasPrefix(".") else { return false }
         for prefix in Self.skippedPrefixes where bundleID.hasPrefix(prefix) { return false }
         return !installed.contains(bundleID)
+    }
+
+    private func isOldEnough(_ url: URL) -> Bool {
+        guard minimumAgeDays > 0 else { return true }
+        guard let values = try? url.resourceValues(forKeys: [.contentModificationDateKey]),
+              let modified = values.contentModificationDate else {
+            return false
+        }
+        let age = Date().timeIntervalSince(modified)
+        return age >= TimeInterval(minimumAgeDays * 24 * 60 * 60)
     }
 }

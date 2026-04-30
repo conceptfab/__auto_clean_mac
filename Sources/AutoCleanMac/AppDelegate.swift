@@ -111,6 +111,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
     private static func otherRunningInstance() -> NSRunningApplication? {
         let currentPID = ProcessInfo.processInfo.processIdentifier
         return NSWorkspace.shared.runningApplications.first { app in
@@ -363,6 +367,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 "user_logs": true,
                 "dev_caches": true,
                 "homebrew_cleanup": false,
+                "project_artifacts": false,
                 "downloads": false
               },
               "browsers": {}
@@ -499,9 +504,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return UninstallOutcome(freedBytes: freed, succeeded: succeeded, failures: failures)
             },
             onScanOrphans: {
-                let installed = InstalledAppRegistry().installedBundleIDs(
+                var installed = InstalledAppRegistry().installedBundleIDs(
                     searchRoots: InstalledAppRegistry.defaultSearchRoots(homeDirectory: home)
                 )
+                installed.formUnion(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
                 return OrphanScanner().scan(homeDirectory: home, installedBundleIDs: installed)
             },
             onRemoveOrphans: { [weak self] groups, mode in

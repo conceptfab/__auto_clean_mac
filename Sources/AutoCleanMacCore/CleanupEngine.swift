@@ -69,6 +69,7 @@ public extension CleanupEngine {
             DSStoreTask(isEnabled: config.tasks.dsStore),
             UserLogsTask(isEnabled: config.tasks.userLogs),
             DevCachesTask(isEnabled: config.tasks.devCaches, runBrew: config.tasks.homebrewCleanup),
+            ProjectArtifactsTask(isEnabled: config.tasks.projectArtifacts),
             DownloadsTask(isEnabled: config.tasks.downloads),
         ]
         for browser in BrowserIdentity.allCases {

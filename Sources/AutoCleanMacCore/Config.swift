@@ -69,6 +69,7 @@ public struct Config: Equatable {
         public var userLogs: Bool
         public var devCaches: Bool
         public var homebrewCleanup: Bool
+        public var projectArtifacts: Bool
         public var downloads: Bool
 
         public init(
@@ -79,6 +80,7 @@ public struct Config: Equatable {
             userLogs: Bool,
             devCaches: Bool,
             homebrewCleanup: Bool = false,
+            projectArtifacts: Bool = false,
             downloads: Bool
         ) {
             self.userCaches = userCaches
@@ -88,12 +90,14 @@ public struct Config: Equatable {
             self.userLogs = userLogs
             self.devCaches = devCaches
             self.homebrewCleanup = homebrewCleanup
+            self.projectArtifacts = projectArtifacts
             self.downloads = downloads
         }
 
         public static let `default` = Tasks(
             userCaches: true, systemTemp: true, trash: true, dsStore: true,
-            userLogs: true, devCaches: true, homebrewCleanup: false, downloads: false
+            userLogs: true, devCaches: true, homebrewCleanup: false,
+            projectArtifacts: false, downloads: false
         )
     }
 
@@ -144,6 +148,7 @@ public struct Config: Equatable {
             if let v = t["user_logs"]      as? Bool { config.tasks.userLogs      = v }
             if let v = t["dev_caches"]     as? Bool { config.tasks.devCaches     = v }
             if let v = t["homebrew_cleanup"] as? Bool { config.tasks.homebrewCleanup = v }
+            if let v = t["project_artifacts"] as? Bool { config.tasks.projectArtifacts = v }
             if let v = t["downloads"]      as? Bool { config.tasks.downloads     = v }
         }
         // Legacy: browser_caches: true włącza cache dla wszystkich przeglądarek

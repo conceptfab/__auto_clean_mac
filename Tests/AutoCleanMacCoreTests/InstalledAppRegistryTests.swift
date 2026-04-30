@@ -17,7 +17,35 @@ final class InstalledAppRegistryTests: XCTestCase {
         XCTAssertEqual(ids, ["com.example.foo", "com.example.bar"])
     }
 
+    func test_collects_nested_bundle_ids_inside_installed_apps() throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Registry-\(UUID().uuidString)")
+        let apps = temp.appendingPathComponent("Applications")
+        let app = apps.appendingPathComponent("Foo.app")
+        try makeAppBundle(at: app, bundleID: "com.example.foo")
+        try makeAppBundle(
+            at: app.appendingPathComponent("Contents/Library/LoginItems/FooHelper.app"),
+            bundleID: "com.example.foo.helper"
+        )
+        try makeBundle(
+            at: app.appendingPathComponent("Contents/XPCServices/FooWorker.xpc"),
+            bundleID: "com.example.foo.worker"
+        )
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let ids = InstalledAppRegistry().installedBundleIDs(searchRoots: [apps])
+
+        XCTAssertEqual(ids, [
+            "com.example.foo",
+            "com.example.foo.helper",
+            "com.example.foo.worker",
+        ])
+    }
+
     private func makeAppBundle(at url: URL, bundleID: String) throws {
+        try makeBundle(at: url, bundleID: bundleID)
+    }
+
+    private func makeBundle(at url: URL, bundleID: String) throws {
         let contents = url.appendingPathComponent("Contents")
         try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
         let plist: [String: Any] = ["CFBundleIdentifier": bundleID, "CFBundleName": url.deletingPathExtension().lastPathComponent]

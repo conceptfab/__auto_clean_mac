@@ -21,6 +21,7 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(config.tasks.userCaches)
         XCTAssertFalse(config.tasks.downloads)
         XCTAssertFalse(config.tasks.homebrewCleanup)
+        XCTAssertFalse(config.tasks.projectArtifacts)
         XCTAssertEqual(config.window.fadeInMs, 800)
         XCTAssertEqual(config.reminder.intervalHours, 24)
         XCTAssertEqual(config.reminder.mode, .remind)
@@ -34,7 +35,7 @@ final class ConfigTests: XCTestCase {
           "reminder": { "interval_hours": 12, "mode": "auto_clean" },
           "window": { "fade_in_ms": 500, "hold_after_ms": 2000, "fade_out_ms": 500 },
           "excluded_paths": ["~/Downloads/Praca", "  /tmp/keep  ", ""],
-          "tasks": { "downloads": true, "homebrew_cleanup": true, "user_caches": false }
+          "tasks": { "downloads": true, "homebrew_cleanup": true, "project_artifacts": true, "user_caches": false }
         }
         """
         try json.write(to: file, atomically: true, encoding: .utf8)
@@ -45,6 +46,7 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config.window.fadeInMs, 500)
         XCTAssertTrue(config.tasks.downloads)
         XCTAssertTrue(config.tasks.homebrewCleanup)
+        XCTAssertTrue(config.tasks.projectArtifacts)
         XCTAssertFalse(config.tasks.userCaches)
         XCTAssertEqual(config.excludedPaths, ["~/Downloads/Praca", "/tmp/keep"])
         // Unspecified keys keep defaults:

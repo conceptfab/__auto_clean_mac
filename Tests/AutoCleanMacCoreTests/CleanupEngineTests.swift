@@ -58,7 +58,7 @@ final class CleanupEngineTests: XCTestCase {
         // Disable other tasks to make the list easier to reason about
         cfg.tasks = Config.Tasks(
             userCaches: false, systemTemp: false, trash: false, dsStore: false,
-            userLogs: false, devCaches: false, downloads: false
+            userLogs: false, devCaches: false, projectArtifacts: false, downloads: false
         )
         cfg.browsers = [
             .chrome:  BrowserPreferences(types: [.cache, .cookies]),

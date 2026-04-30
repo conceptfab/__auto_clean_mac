@@ -49,6 +49,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     "user_logs": true,
     "dev_caches": true,
     "homebrew_cleanup": false,
+    "project_artifacts": false,
     "downloads": false
   },
   "browsers": {}
