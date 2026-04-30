@@ -1,13 +1,13 @@
 import Foundation
 
-public final class Logger {
+public final class Logger: @unchecked Sendable {
     private let directory: URL
-    private let clock: () -> Date
+    private let clock: @Sendable () -> Date
     private let isoFormatter: ISO8601DateFormatter
     private let dayFormatter: DateFormatter
     private let queue = DispatchQueue(label: "autocleanmac.logger")
 
-    public init(directory: URL, clock: @escaping () -> Date = Date.init) throws {
+    public init(directory: URL, clock: @escaping @Sendable () -> Date = { Date() }) throws {
         self.directory = directory
         self.clock = clock
         self.isoFormatter = ISO8601DateFormatter()

@@ -1,6 +1,6 @@
 import Foundation
 
-public final class SafeDeleter {
+public final class SafeDeleter: Sendable {
     public struct DeletionMetrics: Equatable, Sendable {
         public var bytesFreed: Int64
         public var itemsDeleted: Int
@@ -11,7 +11,7 @@ public final class SafeDeleter {
         }
     }
 
-    public enum Mode { case live, dryRun, trash }
+    public enum Mode: Sendable { case live, dryRun, trash }
 
     public enum DeletionError: Error, CustomStringConvertible {
         case outsideAllowedRoot(path: String, root: String)
