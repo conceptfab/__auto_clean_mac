@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-## 📌 Execution Status (paused 2026-04-26 po Task 3.2)
+## 📌 Execution Status (ukończone 2026-04-30)
 
-**Branch:** `next` | **Mode:** subagent-driven-development | **Wykonane: 10/15 tasków** | **Test count: 95 passing, 0 failures**
+**Branch:** `next` | **Mode:** executing-plans | **Wykonane: 15/15 tasków** | **Test count: 99 passing, 0 failures**
 
 | Task | Status |
 |---|---|
@@ -18,11 +18,13 @@
 | 2.2 Production shell clients | ✅ done (dd5cfe1) |
 | 3.1 AppPurger orchestrator | ✅ done (d32ecb0) |
 | 3.2 AppPurger elevation + prefs tests | ✅ done (c91b826) |
-| 4.1 Wire AppPurger into AppDelegate | ⏸️ pending (next up) |
-| 5.1 InstalledAppRegistry | ⏸️ pending |
-| 6.1 OrphanScanner | ⏸️ pending |
-| 7.x OrphanCleanerTab + wiring | ⏸️ pending |
-| 8.1 Final E2E validation | ⏸️ pending |
+| 4.1 Wire AppPurger into AppDelegate | ✅ done (260b74b) |
+| 5.1 InstalledAppRegistry | ✅ done (166cf69) |
+| 6.1 OrphanScanner | ✅ done (be6cafd) |
+| 7.x OrphanCleanerTab + wiring | ✅ done (7098b20) |
+| 8.1 Final E2E validation | ✅ done (release build clean, 99/99 tests pass) |
+
+**Smoke test ręczny pominięty** — wymaga uruchomienia GUI. Plik `./scripts/install.sh` i scenariusze E2E z Step 3 Task 8.1 do walidacji ręcznej przez użytkownika.
 
 ### Notatki dla wznowienia
 
