@@ -8,4 +8,10 @@ final class AppDelegateTests: XCTestCase {
 
         XCTAssertFalse(delegate.applicationShouldTerminateAfterLastWindowClosed(NSApplication.shared))
     }
+
+    func test_appCancelsUnexpectedTerminationRequests() {
+        let delegate = AppDelegate()
+
+        XCTAssertEqual(delegate.applicationShouldTerminate(NSApplication.shared), .terminateCancel)
+    }
 }

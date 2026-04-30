@@ -3,7 +3,7 @@ import SwiftUI
 import AutoCleanMacCore
 import UserNotifications
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private static let openSettingsNotification = Notification.Name("com.micz.autocleanmac.openSettings")
     private static let runCleanupNotification = Notification.Name("com.micz.autocleanmac.runCleanup")
 
@@ -25,13 +25,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var consoleWindow: ConsoleWindow?
     private var settingsWindow: NSWindow?
     private var settingsModel: SettingsModel?
-    private var settingsCloseObserver: NSObjectProtocol?
     private var logger: Logger!
     private var reminderScheduler: ReminderScheduler?
     private var config: Config = .default
     private var statistics: AppStatistics = .empty
     private var launchAtLoginEnabled = false
     private var isRunning = false
+    private var terminationRequested = false
     private let launchContext = LaunchContext(arguments: ProcessInfo.processInfo.arguments)
 
     private let logsDir = FileManager.default.homeDirectoryForCurrentUser
@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 object: nil
             )
             existingApp.activate(options: [.activateIgnoringOtherApps])
-            NSApp.terminate(nil)
+            terminateApplication()
             return
         }
         if Self.otherRunningInstance() != nil, launchContext == .launchAgent {
@@ -56,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Self.runCleanupNotification,
                 object: nil
             )
-            NSApp.terminate(nil)
+            terminateApplication()
             return
         }
 
@@ -64,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             logger = try Logger(directory: logsDir)
         } catch {
             NSLog("AutoCleanMac: failed to create logger at \(logsDir.path): \(error)")
-            NSApp.terminate(nil)
+            terminateApplication()
             return
         }
 
@@ -99,7 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = MenuBarController()
         menu.onRunNow        = { [weak self] in self?.runCleanup(source: "menu") }
         menu.onOpenSettings  = { [weak self] in self?.openSettings() }
-        menu.onQuit          = { NSApp.terminate(nil) }
+        menu.onQuit          = { [weak self] in self?.terminateApplication() }
         menu.install()
         menuBar = menu
 
@@ -113,6 +113,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if sender === settingsWindow {
+            sender.orderOut(nil)
+            return false
+        }
+        return true
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if terminationRequested {
+            return .terminateNow
+        }
+        logger?.log(event: "termination_cancelled", fields: ["reason": "unexpected_request"])
+        return .terminateCancel
+    }
+
+    private func terminateApplication() {
+        terminationRequested = true
+        NSApp.terminate(nil)
     }
 
     private static func otherRunningInstance() -> NSRunningApplication? {
@@ -537,23 +558,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let win = NSWindow(contentViewController: host)
         win.title = "AutoCleanMac — Preferencje"
         win.styleMask = [.titled, .closable, .miniaturizable]
-        win.isReleasedWhenClosed = true
+        win.isReleasedWhenClosed = false
+        win.animationBehavior = .none
+        win.delegate = self
         win.center()
         settingsModel = model
         settingsWindow = win
-        settingsCloseObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.willCloseNotification,
-            object: win,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            if let token = self.settingsCloseObserver {
-                NotificationCenter.default.removeObserver(token)
-            }
-            self.settingsCloseObserver = nil
-            self.settingsModel = nil
-            self.settingsWindow = nil
-        }
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
