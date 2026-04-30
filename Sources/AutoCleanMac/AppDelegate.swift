@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var consoleWindow: ConsoleWindow?
     private var settingsWindow: NSWindow?
     private var settingsModel: SettingsModel?
+    private var settingsCloseObserver: NSObjectProtocol?
     private var logger: Logger!
     private var reminderScheduler: ReminderScheduler?
     private var config: Config = .default
@@ -95,17 +96,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             GlobalShortcutManager.shared.register()
         }
 
-        let menu = MenuBarController()
-        menu.onRunNow        = { [weak self] in self?.runCleanup(source: "menu") }
-        menu.onOpenSettings  = { [weak self] in self?.openSettings() }
-        menu.onQuit          = { NSApp.terminate(nil) }
-        menu.install()
-        menuBar = menu
-
         switch launchContext {
         case .launchAgent:
             runCleanup(source: "launch_agent")
         case .manual:
+            let menu = MenuBarController()
+            menu.onRunNow        = { [weak self] in self?.runCleanup(source: "menu") }
+            menu.onOpenSettings  = { [weak self] in self?.openSettings() }
+            menu.onQuit          = { NSApp.terminate(nil) }
+            menu.install()
+            menuBar = menu
             openSettings()
         }
     }
@@ -530,10 +530,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let win = NSWindow(contentViewController: host)
         win.title = "AutoCleanMac — Preferencje"
         win.styleMask = [.titled, .closable, .miniaturizable]
-        win.isReleasedWhenClosed = false
+        win.isReleasedWhenClosed = true
         win.center()
         settingsModel = model
         settingsWindow = win
+        settingsCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: win,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            if let token = self.settingsCloseObserver {
+                NotificationCenter.default.removeObserver(token)
+            }
+            self.settingsCloseObserver = nil
+            self.settingsModel = nil
+            self.settingsWindow = nil
+        }
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
