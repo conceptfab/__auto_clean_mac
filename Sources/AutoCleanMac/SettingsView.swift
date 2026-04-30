@@ -26,12 +26,18 @@ final class SettingsModel: ObservableObject {
     @Published var whitelistedCacheAppsText: String
     @Published var globalShortcutEnabled: Bool
 
+    @Published var orphans: [OrphanGroup] = []
+    @Published var selectedOrphans: Set<String> = []
+    @Published var orphansScanning: Bool = false
+
     let onApply: (Config, Bool) -> Void
     let onApplyRun: (Config, Bool) -> Void
     let onPreview: (Config) -> Void
     let onOpenLogsFolder: () -> Void
     let onShowLastLog: () -> Void
     let onUninstall: ([AppInfo], SafeDeleter.Mode) async -> UninstallOutcome
+    let onScanOrphans: () async -> [OrphanGroup]
+    let onRemoveOrphans: ([OrphanGroup], SafeDeleter.Mode) async -> UninstallOutcome
     let homeDirectory: URL
     private let baseConfig: Config
 
@@ -45,7 +51,9 @@ final class SettingsModel: ObservableObject {
         onPreview: @escaping (Config) -> Void,
         onOpenLogsFolder: @escaping () -> Void,
         onShowLastLog: @escaping () -> Void,
-        onUninstall: @escaping ([AppInfo], SafeDeleter.Mode) async -> UninstallOutcome
+        onUninstall: @escaping ([AppInfo], SafeDeleter.Mode) async -> UninstallOutcome,
+        onScanOrphans: @escaping () async -> [OrphanGroup],
+        onRemoveOrphans: @escaping ([OrphanGroup], SafeDeleter.Mode) async -> UninstallOutcome
     ) {
         self.baseConfig = initial
         self.retentionDays = initial.retentionDays
@@ -64,7 +72,25 @@ final class SettingsModel: ObservableObject {
         self.onOpenLogsFolder = onOpenLogsFolder
         self.onShowLastLog = onShowLastLog
         self.onUninstall = onUninstall
+        self.onScanOrphans = onScanOrphans
+        self.onRemoveOrphans = onRemoveOrphans
         self.homeDirectory = homeDirectory
+    }
+
+    @MainActor
+    func scanOrphans() async {
+        orphansScanning = true
+        defer { orphansScanning = false }
+        selectedOrphans = []
+        orphans = await onScanOrphans()
+    }
+
+    @MainActor
+    func removeSelectedOrphans() async {
+        let chosen = orphans.filter { selectedOrphans.contains($0.id) }
+        guard !chosen.isEmpty else { return }
+        _ = await onRemoveOrphans(chosen, deleteMode == .live ? .live : .trash)
+        await scanOrphans()
     }
 
     func toggle(_ browser: BrowserIdentity, _ type: BrowserDataType, _ enabled: Bool) {
@@ -148,6 +174,7 @@ struct SettingsView: View {
         case cleanup
         case browsers
         case uninstaller
+        case orphans
         case reminders
         case advanced
         case statistics
@@ -165,6 +192,7 @@ struct SettingsView: View {
             case .cleanup: return "Czyszczenie"
             case .browsers: return "Przeglądarki"
             case .uninstaller: return "Deinstalator"
+            case .orphans: return "Osierocone preferencje"
             case .reminders: return "Przypominacz"
             case .advanced: return "Zaawansowane"
             case .logs: return "Logi"
@@ -180,6 +208,7 @@ struct SettingsView: View {
             case .cleanup: return "trash"
             case .browsers: return "globe"
             case .uninstaller: return "app.dashed"
+            case .orphans: return "questionmark.folder"
             case .reminders: return "bell"
             case .advanced: return "slider.horizontal.3"
             case .logs: return "doc.text"
@@ -254,6 +283,8 @@ struct SettingsView: View {
             BrowsersTab(model: model)
         case .uninstaller:
             UninstallerTab(settingsModel: model)
+        case .orphans:
+            OrphanCleanerTab(settingsModel: model)
         case .reminders:
             RemindersTab(model: model)
         case .advanced:
