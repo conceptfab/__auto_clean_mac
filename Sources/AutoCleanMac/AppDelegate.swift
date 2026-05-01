@@ -15,9 +15,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private enum LaunchContext {
         case launchAgent
         case manual
+        case settingsOnly
+        case cleanupOnly
 
         init(arguments: [String]) {
-            self = arguments.contains("--launch-agent") ? .launchAgent : .manual
+            if arguments.contains("--settings") {
+                self = .settingsOnly
+            } else if arguments.contains("--run-cleanup") {
+                self = .cleanupOnly
+            } else if arguments.contains("--launch-agent") {
+                self = .launchAgent
+            } else {
+                self = .manual
+            }
+        }
+
+        var isTransient: Bool {
+            switch self {
+            case .settingsOnly, .cleanupOnly, .launchAgent:
+                return true
+            case .manual:
+                return false
+            }
         }
     }
 
@@ -25,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var consoleWindow: ConsoleWindow?
     private var settingsWindow: NSWindow?
     private var settingsModel: SettingsModel?
+    private var settingsCloseObserver: NSObjectProtocol?
     private var logger: Logger!
     private var reminderScheduler: ReminderScheduler?
     private var config: Config = .default
@@ -87,39 +107,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         statistics = AppStatisticsStore.loadOrDefault(from: statisticsPath, logger: logger)
         launchAtLoginEnabled = LaunchAgentManager.isEnabled()
-        reminderScheduler = ReminderScheduler(logger: logger) { [weak self] in
-            self?.runCleanup(source: "reminder_auto")
-        }
-        reminderScheduler?.update(with: config.reminder)
-        
-        if config.globalShortcutEnabled {
-            GlobalShortcutManager.shared.register()
+        if launchContext == .manual {
+            reminderScheduler = ReminderScheduler(logger: logger) { [weak self] in
+                self?.runCleanup(source: "reminder_auto")
+            }
+            reminderScheduler?.update(with: config.reminder)
+
+            if config.globalShortcutEnabled {
+                GlobalShortcutManager.shared.register()
+            }
         }
 
-        let menu = MenuBarController()
-        menu.onRunNow        = { [weak self] in self?.runCleanup(source: "menu") }
-        menu.onOpenSettings  = { [weak self] in self?.openSettings() }
-        menu.onQuit          = { [weak self] in self?.terminateApplication() }
-        menu.install()
-        menuBar = menu
+        if launchContext == .manual {
+            let menu = MenuBarController()
+            menu.onRunNow        = { [weak self] in self?.runCleanup(source: "menu") }
+            menu.onOpenSettings  = { [weak self] in self?.openSettings() }
+            menu.onQuit          = { [weak self] in self?.terminateApplication() }
+            menu.install()
+            menuBar = menu
+        }
 
         switch launchContext {
         case .launchAgent:
             runCleanup(source: "launch_agent")
         case .manual:
             openSettings()
+        case .settingsOnly:
+            openSettings()
+        case .cleanupOnly:
+            runCleanup(source: "menu")
         }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        false
+        launchContext.isTransient
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        if sender === settingsWindow {
-            sender.orderOut(nil)
-            return false
-        }
         return true
     }
 
@@ -138,8 +162,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private static func otherRunningInstance() -> NSRunningApplication? {
         let currentPID = ProcessInfo.processInfo.processIdentifier
+        let uiExecutableNames: Set<String> = ["AutoCleanMacUI"]
         return NSWorkspace.shared.runningApplications.first { app in
-            app.bundleIdentifier == Bundle.main.bundleIdentifier && app.processIdentifier != currentPID
+            guard app.bundleIdentifier == Bundle.main.bundleIdentifier,
+                  app.processIdentifier != currentPID,
+                  let executableName = app.executableURL?.lastPathComponent
+            else {
+                return false
+            }
+            return uiExecutableNames.contains(executableName)
         }
     }
 
@@ -234,6 +265,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 window.fadeOutAndClose(holdMs: effectiveConfig.window.holdAfterMs, fadeOutMs: effectiveConfig.window.fadeOutMs) {
                     self.consoleWindow = nil
                     self.isRunning = false
+                    if self.launchContext.isTransient {
+                        self.terminateApplication()
+                    }
                 }
             }
         }
@@ -558,14 +592,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let win = NSWindow(contentViewController: host)
         win.title = "AutoCleanMac — Preferencje"
         win.styleMask = [.titled, .closable, .miniaturizable]
-        win.isReleasedWhenClosed = false
+        win.isReleasedWhenClosed = true
         win.animationBehavior = .none
         win.delegate = self
         win.center()
         settingsModel = model
         settingsWindow = win
+        settingsCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: win,
+            queue: .main
+        ) { [weak self] _ in
+            self?.releaseSettingsWindow()
+        }
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func releaseSettingsWindow() {
+        if let token = settingsCloseObserver {
+            NotificationCenter.default.removeObserver(token)
+        }
+        settingsCloseObserver = nil
+        settingsWindow?.delegate = nil
+        settingsWindow?.contentViewController = nil
+        settingsModel = nil
+        settingsWindow = nil
+        if launchContext == .settingsOnly {
+            terminateApplication()
+        }
     }
 
 }

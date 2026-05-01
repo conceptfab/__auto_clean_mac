@@ -19,6 +19,7 @@ if [[ -d "$APP_DEST" ]]; then
 fi
 
 pkill -f "$APP_DEST/Contents/MacOS/AutoCleanMac" 2>/dev/null || true
+pkill -f "$APP_DEST/Contents/MacOS/AutoCleanMacUI" 2>/dev/null || true
 
 read -r -p "Usunąć również konfigurację ($CONFIG_DIR)? [y/N] " answer
 if [[ "$answer" =~ ^[Yy]$ ]]; then

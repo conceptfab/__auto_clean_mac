@@ -13,6 +13,9 @@ APP_NAME="AutoCleanMac"
 BUNDLE_ID="com.micz.autocleanmac"
 VERSION="0.1.0"
 BUILD_DIR="$REPO_ROOT/.build/release"
+MENU_SOURCE="$REPO_ROOT/Sources/AutoCleanMacMenuObjC/main.m"
+MENU_EXECUTABLE="$BUILD_DIR/AutoCleanMacMenuObjC"
+UI_EXECUTABLE="AutoCleanMacUI"
 OUT_DIR="$REPO_ROOT/.build/bundle"
 APP_DIR="$OUT_DIR/$APP_NAME.app"
 MACOS_DIR="$APP_DIR/Contents/MacOS"
@@ -21,12 +24,17 @@ RESOURCES_DIR="$APP_DIR/Contents/Resources"
 echo "→ swift build -c release"
 swift build -c release
 
+echo "→ clang menu helper"
+clang -fobjc-arc -framework AppKit -framework Carbon "$MENU_SOURCE" -o "$MENU_EXECUTABLE"
+
 echo "→ assembling bundle at $APP_DIR"
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-cp "$BUILD_DIR/$APP_NAME" "$MACOS_DIR/$APP_NAME"
+cp "$MENU_EXECUTABLE" "$MACOS_DIR/$APP_NAME"
+cp "$BUILD_DIR/$APP_NAME" "$MACOS_DIR/$UI_EXECUTABLE"
 chmod +x "$MACOS_DIR/$APP_NAME"
+chmod +x "$MACOS_DIR/$UI_EXECUTABLE"
 
 if [[ -f "$REPO_ROOT/resources/$APP_NAME.icns" ]]; then
     cp "$REPO_ROOT/resources/$APP_NAME.icns" "$RESOURCES_DIR/$APP_NAME.icns"

@@ -23,6 +23,10 @@ fi
 echo "→ building .app bundle"
 "$REPO_ROOT/scripts/build-app-bundle.sh"
 
+echo "→ stopping existing app processes"
+pkill -f "$APP_DEST/Contents/MacOS/$APP_NAME" 2>/dev/null || true
+pkill -f "$APP_DEST/Contents/MacOS/${APP_NAME}UI" 2>/dev/null || true
+
 echo "→ installing to $APP_DEST"
 mkdir -p "$INSTALL_DIR"
 rm -rf "$APP_DEST"
