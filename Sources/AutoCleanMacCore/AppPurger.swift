@@ -72,6 +72,9 @@ public final class AppPurger: Sendable {
         if deleter.mode != .dryRun {
             _ = await terminator.terminate(bundleID: bundleID, executableName: nil)
         }
+        if deleter.mode != .dryRun {
+            loginItems.removeLoginItem(appName: displayName, bundleID: bundleID)
+        }
         var bytes: Int64 = 0
         var items = 0
         var failures: [PurgeFailure] = []

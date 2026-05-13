@@ -285,4 +285,62 @@ final class AppPurgerTests: XCTestCase {
 
         XCTAssertTrue(terminator.calls.isEmpty)
     }
+
+    func test_purge_invokes_loginItems_removal_in_live_mode() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("AppPurger-\(UUID().uuidString)")
+        let appURL = temp.appendingPathComponent("Applications/Tiny.app")
+        try FileManager.default.createDirectory(at: appURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let loginItems = SpyLoginItemsClient()
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        _ = await AppPurger(
+            deleter: SafeDeleter(mode: .live, logger: logger),
+            prefsDaemon: SpyPreferencesDaemon(),
+            launchAgents: SpyLaunchAgentClient(),
+            terminator: SpyAppTerminator(),
+            loginItems: loginItems,
+            launchServices: SpyLaunchServicesClient(),
+            elevatedRemove: { _ in },
+            logger: logger
+        ).purge(
+            bundleID: "com.example.Tiny",
+            displayName: "Tiny",
+            appURL: appURL,
+            homeDirectory: temp,
+            systemRoot: temp,
+            includeSystemPaths: false
+        )
+
+        XCTAssertEqual(loginItems.calls, [SpyLoginItemsClient.Call(appName: "Tiny", bundleID: "com.example.Tiny")])
+    }
+
+    func test_purge_dryRun_skips_loginItems() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("AppPurger-\(UUID().uuidString)")
+        let appURL = temp.appendingPathComponent("Applications/Tiny.app")
+        try FileManager.default.createDirectory(at: appURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let loginItems = SpyLoginItemsClient()
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        _ = await AppPurger(
+            deleter: SafeDeleter(mode: .dryRun, logger: logger),
+            prefsDaemon: SpyPreferencesDaemon(),
+            launchAgents: SpyLaunchAgentClient(),
+            terminator: SpyAppTerminator(),
+            loginItems: loginItems,
+            launchServices: SpyLaunchServicesClient(),
+            elevatedRemove: { _ in },
+            logger: logger
+        ).purge(
+            bundleID: "com.example.Tiny",
+            displayName: nil,
+            appURL: appURL,
+            homeDirectory: temp,
+            systemRoot: temp,
+            includeSystemPaths: false
+        )
+
+        XCTAssertTrue(loginItems.calls.isEmpty)
+    }
 }
