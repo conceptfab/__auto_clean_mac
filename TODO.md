@@ -13,20 +13,42 @@ Raport sporządzony 2026-05-13 na podstawie analizy `__mole/` (Bash 52 plików +
 
 `AppPurger.swift` + `LeftoverPathProvider.swift` pokrywają ~30% tego, co `__mole/lib/uninstall/batch.sh`.
 
-| Funkcja w `__mole` | Co robi | Gdzie wstawić w Swift |
-|---|---|---|
-| `stop_launch_services` (`batch.sh:102`) | `launchctl unload` + skanowanie ProgramArguments | rozszerzenie `LaunchAgentClient` |
-| `unregister_app_bundle` + `refresh_launch_services_after_uninstall` (`batch.sh:165,183`) | `lsregister -u` + `-gc -r` (czyści Spotlight/Dock) | nowy `LaunchServicesClient` |
-| `remove_login_item` (`batch.sh:213`) | osascript usuwa wpisy z Login Items | nowy `LoginItemsClient` |
-| `force_kill_app` (`app_protection.sh:1887`) | drabinka SIGTERM/SIGKILL przed usunięciem | rozszerzenie `AppRunning` |
-| `remove_apps_from_dock` (`common.sh:150`) | usuwa wpis z Docka | nowy helper |
-| `find_app_files` / `find_app_system_files` (`app_protection.sh:1151,1635`) | znacznie szerszy zestaw ścieżek niż `LeftoverPathProvider` (DiagnosticReports, vendor-nested, shared apps, pkg receipts) | rozszerzenie `LeftoverPathProvider` |
-| `should_protect_from_uninstall` / `is_critical_system_component` (`app_protection.sh:605,686`) | guard chroniący przed usunięciem komponentów systemowych | **KRYTYCZNE** — nowy `AppProtectionGuard` |
-| `get_brew_cask_name` + `brew_uninstall_cask` (`uninstall/brew.sh:163,183`) | wykrywa cask i woła `brew uninstall --cask --zap` | nowy `HomebrewCaskClient` |
-| `has_sensitive_data` (`batch.sh:40`) | wykrywa pliki wrażliwe (.ssh, .aws, keychain) → ostrzeżenie | nowy helper |
-| System extension warning (`batch.sh:955`) | sprawdza `/Library/SystemExtensions` po usunięciu | post-purge check |
-| Local Network permissions warning (`batch.sh:21`) | wykrywa `NSLocalNetworkUsageDescription` | post-purge UI hint |
-| `pkg_receipt_nonstandard_app_paths` (`pkg_receipts.sh:31`) | parsuje `pkgutil` receipts | rozszerzenie skanera |
+| Status | Funkcja w `__mole` | Co robi | Gdzie wstawić w Swift |
+|---|---|---|---|
+| ❌ | `stop_launch_services` (`batch.sh:102`) | `launchctl unload` + skanowanie ProgramArguments | rozszerzenie `LaunchAgentClient` |
+| ✅ | `unregister_app_bundle` + `refresh_launch_services_after_uninstall` (`batch.sh:165,183`) | `lsregister -u` + `-gc -r` (czyści Spotlight/Dock) | `LaunchServicesClient` (Tasks 7+9) |
+| ✅ | `remove_login_item` (`batch.sh:213`) | osascript usuwa wpisy z Login Items | `LoginItemsClient` (Task 6) |
+| ✅ | `force_kill_app` (`app_protection.sh:1887`) | drabinka quit→SIGTERM→SIGKILL przed usunięciem | `AppTerminator` (Tasks 4+5) |
+| ❌ | `remove_apps_from_dock` (`common.sh:150`) | usuwa wpis z Docka | nowy helper |
+| ❌ | `find_app_files` / `find_app_system_files` (`app_protection.sh:1151,1635`) | znacznie szerszy zestaw ścieżek niż `LeftoverPathProvider` (DiagnosticReports, vendor-nested, shared apps, pkg receipts) | rozszerzenie `LeftoverPathProvider` |
+| ✅ | `should_protect_from_uninstall` / `is_critical_system_component` (`app_protection.sh:605,686`) | guard chroniący przed usunięciem komponentów systemowych | `AppProtectionGuard` (Tasks 1-3) |
+| ❌ | `get_brew_cask_name` + `brew_uninstall_cask` (`uninstall/brew.sh:163,183`) | wykrywa cask i woła `brew uninstall --cask --zap` | nowy `HomebrewCaskClient` |
+| ❌ | `has_sensitive_data` (`batch.sh:40`) | wykrywa pliki wrażliwe (.ssh, .aws, keychain) → ostrzeżenie | nowy helper |
+| ❌ | System extension warning (`batch.sh:955`) | sprawdza `/Library/SystemExtensions` po usunięciu | post-purge check |
+| ❌ | Local Network permissions warning (`batch.sh:21`) | wykrywa `NSLocalNetworkUsageDescription` | post-purge UI hint |
+| ❌ | `pkg_receipt_nonstandard_app_paths` (`pkg_receipts.sh:31`) | parsuje `pkgutil` receipts | rozszerzenie skanera |
+
+### Zrealizowana iteracja (2026-05-13)
+
+Plan: [docs/superpowers/plans/2026-05-13-app-protection-and-purger-ux.md](docs/superpowers/plans/2026-05-13-app-protection-and-purger-ux.md) — 9 tasków TDD, 10 commitów (`00af347..d3eadc3`), 134/134 testów green.
+
+**Nowe pliki Swift:**
+- [AppProtectionGuard.swift](Sources/AutoCleanMacCore/AppProtectionGuard.swift) — pure-value enum z listami `systemCriticalPatterns` (~50 wzorców) + `appleUninstallablePatterns` (Xcode/iWork/FinalCut). Wzorce z `*` (glob → regex). Pusty bundleID = chroniony (defensywny default).
+- [AppTerminator.swift](Sources/AutoCleanMacCore/AppTerminator.swift) — protocol + `ShellAppTerminator` z drabinką osascript quit (3s timeout) → SIGTERM (2s) → SIGKILL (2s).
+- [LoginItemsClient.swift](Sources/AutoCleanMacCore/LoginItemsClient.swift) — protocol + `ShellLoginItemsClient` (osascript do System Events, usuwa po nazwie).
+- [LaunchServicesClient.swift](Sources/AutoCleanMacCore/LaunchServicesClient.swift) — protocol + `ShellLaunchServicesClient` z `unregister(app:)` per-app i `rebuild()` per-batch (15s timeout + fallback bez `system` domain).
+
+**Zmienione pliki:**
+- [AppScanner.swift](Sources/AutoCleanMacCore/AppScanner.swift) — używa `AppProtectionGuard` zamiast `com.apple.*` prefix (Xcode/iWork teraz widoczne w uninstallerze).
+- [AppPurger.swift](Sources/AutoCleanMacCore/AppPurger.swift) — guard na początku (refuse for protected), kolejność: terminate → loginItems → unregister → delete. Wszystko skipowane w dryRun.
+- [AppDelegate.swift](Sources/AutoCleanMac/AppDelegate.swift) — produkcyjne wiring shell klientów; `rebuild()` w `Task.detached(priority: .utility)` po batchu (fire-and-forget, ~5-15s nie blokuje UI).
+
+**Follow-upy zanotowane podczas review (nie blokujące):**
+- `ShellAppTerminator.terminate` z `executableName: nil` używa bundleID jako `pgrep -x` match — rzadko trafia. Powinien być rozwiązany przez plumbing `CFBundleExecutable` z `Info.plist`.
+- `ShellLoginItemsClient` ma lukę w escape (newline w `appName` może wybić AppleScript) i global `.app` strip — w praktyce display names z `CFBundleDisplayName` są bezpieczne, ale harden warto przed user-supplied names.
+- Hardcoded `lsregister` path — silent fail jeśli kiedyś Apple go przeniesie. Warto `os_log` ostrzeżenie.
+- Brak SIGKILL eskalacji w `ShellLaunchServicesClient.run` po timeout `terminate()` (low risk dla short-lived CLI).
+- `osascript` może osierocić proces przy timeout w `ShellAppTerminator.runWithTimeout` (brak `terminate()` po stronie work-taska).
 
 ---
 
