@@ -515,13 +515,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 guard let self else {
                     return UninstallOutcome(freedBytes: 0, succeeded: 0, failures: [])
                 }
+                let launchServices = ShellLaunchServicesClient()
                 let purger = AppPurger(
                     deleter: SafeDeleter(mode: mode, logger: self.logger),
                     prefsDaemon: ShellPreferencesDaemonClient(),
                     launchAgents: ShellLaunchAgentClient(),
                     terminator: ShellAppTerminator(),
-                    loginItems: NoopLoginItemsClient(),
-                    launchServices: NoopLaunchServicesClient(),
+                    loginItems: ShellLoginItemsClient(),
+                    launchServices: launchServices,
                     elevatedRemove: { url in
                         try await MainActor.run {
                             if mode == .trash {
@@ -559,6 +560,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         failures.append(UninstallFailure(appName: app.name, reason: f.reason))
                     }
                 }
+
+                if mode != .dryRun, succeeded > 0 {
+                    // Fire-and-forget: LaunchServices rebuild can take ~5–15s. The UI
+                    // already shows the uninstall summary; we don't want to block on it.
+                    Task.detached(priority: .utility) {
+                        launchServices.rebuild()
+                    }
+                }
+
                 return UninstallOutcome(freedBytes: freed, succeeded: succeeded, failures: failures)
             },
             onScanOrphans: {
@@ -626,15 +636,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
-}
-
-// MARK: - Temporary no-op clients (real impls land in Tasks 6 + 7)
-
-private struct NoopLoginItemsClient: LoginItemsClient {
-    func removeLoginItem(appName: String?, bundleID: String) {}
-}
-
-private struct NoopLaunchServicesClient: LaunchServicesClient {
-    func unregister(app: URL) {}
-    func rebuild() {}
 }
