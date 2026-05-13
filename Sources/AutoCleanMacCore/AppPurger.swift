@@ -47,6 +47,17 @@ public final class AppPurger: Sendable {
         includeSystemPaths: Bool
     ) async -> PurgeOutcome {
         let fm = FileManager.default
+        // Hard safety gate: never act on a protected bundle ID.
+        if AppProtectionGuard.isProtected(bundleID: bundleID) {
+            logger.log(event: "purge_refused", fields: ["bundle": bundleID, "reason": "protected"])
+            return PurgeOutcome(
+                appRemoved: false,
+                bytesFreed: 0,
+                itemsDeleted: 0,
+                elevatedFallbackUsed: false,
+                failures: [PurgeFailure(path: appURL.path, reason: "Aplikacja chroniona przez AppProtectionGuard [protected] (\(bundleID))")]
+            )
+        }
         var bytes: Int64 = 0
         var items = 0
         var failures: [PurgeFailure] = []

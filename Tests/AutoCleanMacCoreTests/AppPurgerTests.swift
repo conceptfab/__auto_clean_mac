@@ -148,4 +148,40 @@ final class AppPurgerTests: XCTestCase {
         )
         XCTAssertTrue(prefs.calls.isEmpty)
     }
+
+    func test_purge_refuses_to_remove_protected_app() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("AppPurger-\(UUID().uuidString)")
+        let appURL = temp.appendingPathComponent("Applications/Finder.app")
+        try FileManager.default.createDirectory(at: appURL, withIntermediateDirectories: true)
+        try Data(repeating: 1, count: 100).write(to: appURL.appendingPathComponent("contents"))
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        let prefs = SpyPreferencesDaemon()
+        let purger = AppPurger(
+            deleter: SafeDeleter(mode: .live, logger: logger),
+            prefsDaemon: prefs,
+            launchAgents: SpyLaunchAgentClient(),
+            elevatedRemove: { _ in XCTFail("Protected app must not trigger elevation") },
+            logger: logger
+        )
+
+        let outcome = await purger.purge(
+            bundleID: "com.apple.finder",
+            displayName: "Finder",
+            appURL: appURL,
+            homeDirectory: temp,
+            systemRoot: temp,
+            includeSystemPaths: false
+        )
+
+        XCTAssertFalse(outcome.appRemoved)
+        XCTAssertEqual(outcome.bytesFreed, 0)
+        XCTAssertEqual(outcome.itemsDeleted, 0)
+        XCTAssertEqual(outcome.failures.count, 1)
+        XCTAssertEqual(outcome.failures.first?.path, appURL.path)
+        XCTAssertTrue(outcome.failures.first?.reason.contains("protected") == true)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: appURL.path))
+        XCTAssertTrue(prefs.calls.isEmpty, "prefs daemon must not be called for protected apps")
+    }
 }
