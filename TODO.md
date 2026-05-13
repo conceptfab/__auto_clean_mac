@@ -107,13 +107,13 @@ Logika do skopiowania jako `WhitelistManager.swift` + nowa zakładka w UI.
 
 ## Rekomendowana kolejność implementacji
 
-1. **`AppProtectionGuard`** (najpierw bezpieczeństwo) — żeby `AppPurger` nie usunął np. Findera
-2. **Login Items + LaunchServices unregister/rebuild + force_kill** w `AppPurger` (małe pliki, duża wartość UX)
-3. **Brew cask detection** w `AppPurger` (typowy use-case — apki instalowane przez `brew install --cask`)
-4. **Rozszerzenie `LeftoverPathProvider`** o ścieżki z `find_app_files`/`find_app_system_files`
-5. **`XcodeCleanupTask`** + **`TimeMachineSnapshotsTask`** jako nowe taski
-6. **Zakładka „Optimize"** z 3–4 bezpiecznymi zadaniami (DNS flush, font cache, periodic maintenance, SQLite vacuum)
-7. **Whitelist UI**
+1. ✅ **`AppProtectionGuard`** (najpierw bezpieczeństwo) — żeby `AppPurger` nie usunął np. Findera _— zrealizowane 2026-05-13, commits `00af347`, `8ec06a6`, `3dd47e8`, `39bfd3e`_
+2. ✅ **Login Items + LaunchServices unregister/rebuild + force_kill** w `AppPurger` (małe pliki, duża wartość UX) _— zrealizowane 2026-05-13, commits `c69cefd`, `2a6e0e1`, `1669738`, `171b87d`, `c1b2886`, `d3eadc3`_
+3. ⏳ **Brew cask detection** w `AppPurger` (typowy use-case — apki instalowane przez `brew install --cask`)
+4. ⏳ **Rozszerzenie `LeftoverPathProvider`** o ścieżki z `find_app_files`/`find_app_system_files`
+5. ⏳ **`XcodeCleanupTask`** + **`TimeMachineSnapshotsTask`** jako nowe taski
+6. ⏳ **Zakładka „Optimize"** z 3–4 bezpiecznymi zadaniami (DNS flush, font cache, periodic maintenance, SQLite vacuum)
+7. ⏳ **Whitelist UI**
 
 ---
 
