@@ -75,6 +75,9 @@ public final class AppPurger: Sendable {
         if deleter.mode != .dryRun {
             loginItems.removeLoginItem(appName: displayName, bundleID: bundleID)
         }
+        if deleter.mode != .dryRun, appURL.pathExtension == "app" {
+            launchServices.unregister(app: appURL)
+        }
         var bytes: Int64 = 0
         var items = 0
         var failures: [PurgeFailure] = []

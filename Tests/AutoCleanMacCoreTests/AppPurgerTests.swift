@@ -343,4 +343,63 @@ final class AppPurgerTests: XCTestCase {
 
         XCTAssertTrue(loginItems.calls.isEmpty)
     }
+
+    func test_purge_unregisters_bundle_from_launchservices_in_live_mode() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("AppPurger-\(UUID().uuidString)")
+        let appURL = temp.appendingPathComponent("Applications/Tiny.app")
+        try FileManager.default.createDirectory(at: appURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let launchServices = SpyLaunchServicesClient()
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        _ = await AppPurger(
+            deleter: SafeDeleter(mode: .live, logger: logger),
+            prefsDaemon: SpyPreferencesDaemon(),
+            launchAgents: SpyLaunchAgentClient(),
+            terminator: SpyAppTerminator(),
+            loginItems: SpyLoginItemsClient(),
+            launchServices: launchServices,
+            elevatedRemove: { _ in },
+            logger: logger
+        ).purge(
+            bundleID: "com.example.Tiny",
+            displayName: "Tiny",
+            appURL: appURL,
+            homeDirectory: temp,
+            systemRoot: temp,
+            includeSystemPaths: false
+        )
+
+        XCTAssertEqual(launchServices.unregisterCalls, [appURL])
+        XCTAssertEqual(launchServices.rebuildCalls, 0, "AppPurger must not call rebuild — that is a batch-level concern")
+    }
+
+    func test_purge_dryRun_skips_launchservices_unregister() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("AppPurger-\(UUID().uuidString)")
+        let appURL = temp.appendingPathComponent("Applications/Tiny.app")
+        try FileManager.default.createDirectory(at: appURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let launchServices = SpyLaunchServicesClient()
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        _ = await AppPurger(
+            deleter: SafeDeleter(mode: .dryRun, logger: logger),
+            prefsDaemon: SpyPreferencesDaemon(),
+            launchAgents: SpyLaunchAgentClient(),
+            terminator: SpyAppTerminator(),
+            loginItems: SpyLoginItemsClient(),
+            launchServices: launchServices,
+            elevatedRemove: { _ in },
+            logger: logger
+        ).purge(
+            bundleID: "com.example.Tiny",
+            displayName: nil,
+            appURL: appURL,
+            homeDirectory: temp,
+            systemRoot: temp,
+            includeSystemPaths: false
+        )
+
+        XCTAssertTrue(launchServices.unregisterCalls.isEmpty)
+    }
 }
