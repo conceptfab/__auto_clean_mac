@@ -402,4 +402,72 @@ final class AppPurgerTests: XCTestCase {
 
         XCTAssertTrue(launchServices.unregisterCalls.isEmpty)
     }
+
+    final class OrderRecorder: @unchecked Sendable {
+        private let lock = NSLock()
+        private var events: [String] = []
+        func record(_ event: String) {
+            lock.lock(); defer { lock.unlock() }
+            events.append(event)
+        }
+        func snapshot() -> [String] {
+            lock.lock(); defer { lock.unlock() }
+            return events
+        }
+    }
+
+    func test_purge_runs_pre_deletion_steps_in_correct_order() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("AppPurger-\(UUID().uuidString)")
+        let appURL = temp.appendingPathComponent("Applications/Tiny.app")
+        try FileManager.default.createDirectory(at: appURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let recorder = OrderRecorder()
+
+        final class RecordingTerminator: AppTerminator, @unchecked Sendable {
+            let r: OrderRecorder
+            init(_ r: OrderRecorder) { self.r = r }
+            func terminate(bundleID: String, executableName: String?) async -> Bool {
+                r.record("terminate"); return true
+            }
+        }
+        final class RecordingLoginItems: LoginItemsClient, @unchecked Sendable {
+            let r: OrderRecorder
+            init(_ r: OrderRecorder) { self.r = r }
+            func removeLoginItem(appName: String?, bundleID: String) {
+                r.record("loginItems")
+            }
+        }
+        final class RecordingLaunchServices: LaunchServicesClient, @unchecked Sendable {
+            let r: OrderRecorder
+            init(_ r: OrderRecorder) { self.r = r }
+            func unregister(app: URL) { r.record("unregister") }
+            func rebuild() { r.record("rebuild") }
+        }
+
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        _ = await AppPurger(
+            deleter: SafeDeleter(mode: .live, logger: logger),
+            prefsDaemon: SpyPreferencesDaemon(),
+            launchAgents: SpyLaunchAgentClient(),
+            terminator: RecordingTerminator(recorder),
+            loginItems: RecordingLoginItems(recorder),
+            launchServices: RecordingLaunchServices(recorder),
+            elevatedRemove: { _ in },
+            logger: logger
+        ).purge(
+            bundleID: "com.example.Tiny",
+            displayName: "Tiny",
+            appURL: appURL,
+            homeDirectory: temp,
+            systemRoot: temp,
+            includeSystemPaths: false
+        )
+
+        // We do not assert on what comes after `unregister` — the deleter itself is
+        // not on the recorder. The key invariant is the prefix.
+        let events = recorder.snapshot()
+        XCTAssertEqual(Array(events.prefix(3)), ["terminate", "loginItems", "unregister"])
+        XCTAssertFalse(events.contains("rebuild"), "rebuild() is a batch concern, not per-app")
+    }
 }
