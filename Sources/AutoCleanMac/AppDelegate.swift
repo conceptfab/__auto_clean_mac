@@ -519,6 +519,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     deleter: SafeDeleter(mode: mode, logger: self.logger),
                     prefsDaemon: ShellPreferencesDaemonClient(),
                     launchAgents: ShellLaunchAgentClient(),
+                    terminator: ShellAppTerminator(),
+                    loginItems: NoopLoginItemsClient(),
+                    launchServices: NoopLaunchServicesClient(),
                     elevatedRemove: { url in
                         try await MainActor.run {
                             if mode == .trash {
@@ -623,4 +626,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
+}
+
+// MARK: - Temporary no-op clients (real impls land in Tasks 6 + 7)
+
+private struct NoopLoginItemsClient: LoginItemsClient {
+    func removeLoginItem(appName: String?, bundleID: String) {}
+}
+
+private struct NoopLaunchServicesClient: LaunchServicesClient {
+    func unregister(app: URL) {}
+    func rebuild() {}
 }

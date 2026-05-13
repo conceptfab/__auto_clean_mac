@@ -18,6 +18,34 @@ final class SpyLaunchAgentClient: LaunchAgentClient, @unchecked Sendable {
     }
 }
 
+final class SpyAppTerminator: AppTerminator, @unchecked Sendable {
+    struct Call: Equatable { let bundleID: String; let executableName: String? }
+    var calls: [Call] = []
+    func terminate(bundleID: String, executableName: String?) async -> Bool {
+        calls.append(Call(bundleID: bundleID, executableName: executableName))
+        return true
+    }
+}
+
+final class SpyLoginItemsClient: LoginItemsClient, @unchecked Sendable {
+    struct Call: Equatable { let appName: String?; let bundleID: String }
+    var calls: [Call] = []
+    func removeLoginItem(appName: String?, bundleID: String) {
+        calls.append(Call(appName: appName, bundleID: bundleID))
+    }
+}
+
+final class SpyLaunchServicesClient: LaunchServicesClient, @unchecked Sendable {
+    var unregisterCalls: [URL] = []
+    var rebuildCalls: Int = 0
+    func unregister(app: URL) {
+        unregisterCalls.append(app)
+    }
+    func rebuild() {
+        rebuildCalls += 1
+    }
+}
+
 final class AppPurgerTests: XCTestCase {
     func test_purge_removes_app_and_userside_leftovers_in_dryRun() async throws {
         let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("AppPurger-\(UUID().uuidString)")
@@ -37,6 +65,9 @@ final class AppPurgerTests: XCTestCase {
             deleter: SafeDeleter(mode: .dryRun, logger: logger),
             prefsDaemon: SpyPreferencesDaemon(),
             launchAgents: SpyLaunchAgentClient(),
+            terminator: SpyAppTerminator(),
+            loginItems: SpyLoginItemsClient(),
+            launchServices: SpyLaunchServicesClient(),
             elevatedRemove: { _ in XCTFail("Nie powinno być elewacji w dryRun") },
             logger: logger
         )
@@ -75,6 +106,9 @@ final class AppPurgerTests: XCTestCase {
             deleter: SafeDeleter(mode: .live, logger: logger),
             prefsDaemon: SpyPreferencesDaemon(),
             launchAgents: SpyLaunchAgentClient(),
+            terminator: SpyAppTerminator(),
+            loginItems: SpyLoginItemsClient(),
+            launchServices: SpyLaunchServicesClient(),
             elevatedRemove: { url in
                 elevatedCalls.append(url)
                 // "Udajemy" sukces — usuwamy ręcznie po zdjęciu blokady chwilowo
@@ -111,6 +145,9 @@ final class AppPurgerTests: XCTestCase {
             deleter: SafeDeleter(mode: .live, logger: logger),
             prefsDaemon: prefs,
             launchAgents: SpyLaunchAgentClient(),
+            terminator: SpyAppTerminator(),
+            loginItems: SpyLoginItemsClient(),
+            launchServices: SpyLaunchServicesClient(),
             elevatedRemove: { _ in },
             logger: logger
         ).purge(
@@ -136,6 +173,9 @@ final class AppPurgerTests: XCTestCase {
             deleter: SafeDeleter(mode: .dryRun, logger: logger),
             prefsDaemon: prefs,
             launchAgents: SpyLaunchAgentClient(),
+            terminator: SpyAppTerminator(),
+            loginItems: SpyLoginItemsClient(),
+            launchServices: SpyLaunchServicesClient(),
             elevatedRemove: { _ in },
             logger: logger
         ).purge(
@@ -162,6 +202,9 @@ final class AppPurgerTests: XCTestCase {
             deleter: SafeDeleter(mode: .live, logger: logger),
             prefsDaemon: prefs,
             launchAgents: SpyLaunchAgentClient(),
+            terminator: SpyAppTerminator(),
+            loginItems: SpyLoginItemsClient(),
+            launchServices: SpyLaunchServicesClient(),
             elevatedRemove: { _ in XCTFail("Protected app must not trigger elevation") },
             logger: logger
         )
@@ -183,5 +226,63 @@ final class AppPurgerTests: XCTestCase {
         XCTAssertTrue(outcome.failures.first?.reason.contains("chroniona") == true)
         XCTAssertTrue(FileManager.default.fileExists(atPath: appURL.path))
         XCTAssertTrue(prefs.calls.isEmpty, "prefs daemon must not be called for protected apps")
+    }
+
+    func test_purge_invokes_terminator_before_deletion() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("AppPurger-\(UUID().uuidString)")
+        let appURL = temp.appendingPathComponent("Applications/Tiny.app")
+        try FileManager.default.createDirectory(at: appURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let terminator = SpyAppTerminator()
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        _ = await AppPurger(
+            deleter: SafeDeleter(mode: .live, logger: logger),
+            prefsDaemon: SpyPreferencesDaemon(),
+            launchAgents: SpyLaunchAgentClient(),
+            terminator: terminator,
+            loginItems: SpyLoginItemsClient(),
+            launchServices: SpyLaunchServicesClient(),
+            elevatedRemove: { _ in },
+            logger: logger
+        ).purge(
+            bundleID: "com.example.Tiny",
+            displayName: "Tiny",
+            appURL: appURL,
+            homeDirectory: temp,
+            systemRoot: temp,
+            includeSystemPaths: false
+        )
+
+        XCTAssertEqual(terminator.calls, [SpyAppTerminator.Call(bundleID: "com.example.Tiny", executableName: nil)])
+    }
+
+    func test_purge_dryRun_skips_terminator() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("AppPurger-\(UUID().uuidString)")
+        let appURL = temp.appendingPathComponent("Applications/Tiny.app")
+        try FileManager.default.createDirectory(at: appURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let terminator = SpyAppTerminator()
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        _ = await AppPurger(
+            deleter: SafeDeleter(mode: .dryRun, logger: logger),
+            prefsDaemon: SpyPreferencesDaemon(),
+            launchAgents: SpyLaunchAgentClient(),
+            terminator: terminator,
+            loginItems: SpyLoginItemsClient(),
+            launchServices: SpyLaunchServicesClient(),
+            elevatedRemove: { _ in },
+            logger: logger
+        ).purge(
+            bundleID: "com.example.Tiny",
+            displayName: "Tiny",
+            appURL: appURL,
+            homeDirectory: temp,
+            systemRoot: temp,
+            includeSystemPaths: false
+        )
+
+        XCTAssertTrue(terminator.calls.isEmpty)
     }
 }

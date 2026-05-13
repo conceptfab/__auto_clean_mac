@@ -21,6 +21,9 @@ public final class AppPurger: Sendable {
     private let deleter: SafeDeleter
     private let prefsDaemon: PreferencesDaemonClient
     private let launchAgents: LaunchAgentClient
+    private let terminator: AppTerminator
+    private let loginItems: LoginItemsClient
+    private let launchServices: LaunchServicesClient
     private let elevatedRemove: @Sendable (URL) async throws -> Void
     private let logger: Logger
 
@@ -28,12 +31,18 @@ public final class AppPurger: Sendable {
         deleter: SafeDeleter,
         prefsDaemon: PreferencesDaemonClient,
         launchAgents: LaunchAgentClient,
+        terminator: AppTerminator,
+        loginItems: LoginItemsClient,
+        launchServices: LaunchServicesClient,
         elevatedRemove: @escaping @Sendable (URL) async throws -> Void,
         logger: Logger
     ) {
         self.deleter = deleter
         self.prefsDaemon = prefsDaemon
         self.launchAgents = launchAgents
+        self.terminator = terminator
+        self.loginItems = loginItems
+        self.launchServices = launchServices
         self.elevatedRemove = elevatedRemove
         self.logger = logger
     }
@@ -57,6 +66,11 @@ public final class AppPurger: Sendable {
                 elevatedFallbackUsed: false,
                 failures: [PurgeFailure(path: appURL.path, reason: "Aplikacja chroniona przez AppProtectionGuard (\(bundleID))")]
             )
+        }
+        // Best-effort process termination before deletion. macOS allows deleting a
+        // running bundle, so we never abort on terminator failure.
+        if deleter.mode != .dryRun {
+            _ = await terminator.terminate(bundleID: bundleID, executableName: nil)
         }
         var bytes: Int64 = 0
         var items = 0
