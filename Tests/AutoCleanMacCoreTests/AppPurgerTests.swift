@@ -180,7 +180,7 @@ final class AppPurgerTests: XCTestCase {
         XCTAssertEqual(outcome.itemsDeleted, 0)
         XCTAssertEqual(outcome.failures.count, 1)
         XCTAssertEqual(outcome.failures.first?.path, appURL.path)
-        XCTAssertTrue(outcome.failures.first?.reason.contains("protected") == true)
+        XCTAssertTrue(outcome.failures.first?.reason.contains("chroniona") == true)
         XCTAssertTrue(FileManager.default.fileExists(atPath: appURL.path))
         XCTAssertTrue(prefs.calls.isEmpty, "prefs daemon must not be called for protected apps")
     }

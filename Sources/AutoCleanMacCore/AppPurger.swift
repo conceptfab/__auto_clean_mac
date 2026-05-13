@@ -55,7 +55,7 @@ public final class AppPurger: Sendable {
                 bytesFreed: 0,
                 itemsDeleted: 0,
                 elevatedFallbackUsed: false,
-                failures: [PurgeFailure(path: appURL.path, reason: "Aplikacja chroniona przez AppProtectionGuard [protected] (\(bundleID))")]
+                failures: [PurgeFailure(path: appURL.path, reason: "Aplikacja chroniona przez AppProtectionGuard (\(bundleID))")]
             )
         }
         var bytes: Int64 = 0
