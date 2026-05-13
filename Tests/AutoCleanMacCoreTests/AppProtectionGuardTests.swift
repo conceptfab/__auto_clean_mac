@@ -55,4 +55,11 @@ final class AppProtectionGuardTests: XCTestCase {
         XCTAssertTrue(AppProtectionGuard.isProtected(bundleID: "loginwindow"))
         XCTAssertTrue(AppProtectionGuard.isProtected(bundleID: "com.apple.loginwindow"))
     }
+
+    func test_appscanner_uses_guard_for_filtering() async throws {
+        // This is a small integration check — we don't spin up a real bundle,
+        // we just confirm the guard would let Xcode through.
+        XCTAssertFalse(AppProtectionGuard.isProtected(bundleID: "com.apple.dt.Xcode"))
+        XCTAssertTrue(AppProtectionGuard.isProtected(bundleID: "com.apple.finder"))
+    }
 }

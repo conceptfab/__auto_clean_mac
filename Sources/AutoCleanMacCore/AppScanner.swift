@@ -48,13 +48,12 @@ public final class AppScanner: Sendable {
     }
     
     private func processApp(at url: URL, homeDirectory: URL, fileManager: FileManager) async -> AppInfo? {
-        // Zabezpieczenie przed usuwaniem systemowych aplikacji
+        // Defense-in-depth: never scan /System/. AppProtectionGuard is authoritative for bundle IDs.
         guard !url.path.hasPrefix("/System/") else { return nil }
-        guard !url.path.hasPrefix("/Applications/Utilities/") else { return nil }
-        
+
         guard let bundle = Bundle(url: url),
               let bundleID = bundle.bundleIdentifier,
-              !bundleID.hasPrefix("com.apple.") else {
+              !AppProtectionGuard.isProtected(bundleID: bundleID) else {
             return nil
         }
         
