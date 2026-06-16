@@ -152,4 +152,16 @@ final class SafeDeleterTests: XCTestCase {
         XCTAssertTrue(root.isWithin(root))          // the root itself counts as within
         XCTAssertFalse(sibling.isWithin(root))      // the bug: must NOT match
     }
+
+    func test_isWithin_descendant_and_outside_cases() {
+        let root = URL(fileURLWithPath: "/Users/x/Library/LaunchAgents")
+        // Deeper descendant is within.
+        XCTAssertTrue(URL(fileURLWithPath: "/Users/x/Library/LaunchAgents/sub/com.foo.plist").isWithin(root))
+        // Parent and unrelated paths are NOT within.
+        XCTAssertFalse(URL(fileURLWithPath: "/Users/x/Library").isWithin(root))
+        XCTAssertFalse(URL(fileURLWithPath: "/Users/x/Other").isWithin(root))
+        // Trailing slash on the root still matches.
+        XCTAssertTrue(URL(fileURLWithPath: "/Users/x/Library/LaunchAgents/com.foo.plist")
+            .isWithin(URL(fileURLWithPath: "/Users/x/Library/LaunchAgents/")))
+    }
 }

@@ -136,11 +136,15 @@ public final class SafeDeleter: Sendable {
 }
 
 public extension URL {
-    /// True when `self` is `root` itself or a descendant of it, comparing on path
+    /// True when `self` is `root` itself or a descendant of it, compared on path
     /// boundaries (so `…/Foo-Backup` does NOT count as within `…/Foo`).
+    ///
+    /// Both URLs are resolved (`resolvingSymlinksInPath().standardizedFileURL`) before
+    /// comparison, so callers need not pre-normalize. This mirrors the boundary guard in
+    /// `SafeDeleter.deleteMeasured`.
     func isWithin(_ root: URL) -> Bool {
-        let rootStr = root.path
-        let selfStr = self.path
+        let rootStr = root.resolvingSymlinksInPath().standardizedFileURL.path
+        let selfStr = self.resolvingSymlinksInPath().standardizedFileURL.path
         let rootWithSep = rootStr.hasSuffix("/") ? rootStr : rootStr + "/"
         return selfStr == rootStr || selfStr.hasPrefix(rootWithSep)
     }
