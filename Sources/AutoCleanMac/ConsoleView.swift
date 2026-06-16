@@ -12,6 +12,11 @@ final class ConsoleViewModel: ObservableObject {
     /// Hard cap so a long run can't grow the console buffer without bound.
     static let maxLines = 500
 
+    /// Appends a line, trimming the oldest entries past `maxLines`.
+    /// Safe w.r.t. AppDelegate's in-progress placeholder removal *because* tasks emit
+    /// events serially on the main actor, so the placeholder is always the most recent
+    /// line and is never trimmed before its own `taskFinished` removes it. If tasks ever
+    /// run concurrently or emit many lines before finishing, revisit this assumption.
     func appendLine(_ line: Line) {
         lines.append(line)
         if lines.count > Self.maxLines {
