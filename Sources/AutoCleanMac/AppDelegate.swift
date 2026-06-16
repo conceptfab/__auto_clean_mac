@@ -563,6 +563,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             },
             onScanOrphans: {
                 let running = NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)
+                // `detached` is required: the enclosing closure is @MainActor-isolated, so a
+                // plain `Task {}` would inherit that isolation and run this back on the main
+                // thread, reintroducing the Settings-window freeze this fix removed.
                 return await Task.detached(priority: .userInitiated) {
                     var installed = InstalledAppRegistry().installedBundleIDs(
                         searchRoots: InstalledAppRegistry.defaultSearchRoots(homeDirectory: home)
@@ -574,6 +577,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             onRemoveOrphans: { [weak self] groups, mode in
                 guard let self else { return UninstallOutcome(freedBytes: 0, succeeded: 0, failures: []) }
                 let logger: Logger = self.logger
+                // `detached` is required: the enclosing closure is @MainActor-isolated, so a
+                // plain `Task {}` would inherit that isolation and run this back on the main
+                // thread, reintroducing the Settings-window freeze this fix removed.
                 return await Task.detached(priority: .userInitiated) {
                     let deleter = SafeDeleter(mode: mode, logger: logger)
                     let userLib = home.appendingPathComponent("Library")
