@@ -134,3 +134,14 @@ public final class SafeDeleter: Sendable {
         }
     }
 }
+
+public extension URL {
+    /// True when `self` is `root` itself or a descendant of it, comparing on path
+    /// boundaries (so `…/Foo-Backup` does NOT count as within `…/Foo`).
+    func isWithin(_ root: URL) -> Bool {
+        let rootStr = root.path
+        let selfStr = self.path
+        let rootWithSep = rootStr.hasSuffix("/") ? rootStr : rootStr + "/"
+        return selfStr == rootStr || selfStr.hasPrefix(rootWithSep)
+    }
+}

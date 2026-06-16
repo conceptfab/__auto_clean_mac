@@ -143,4 +143,13 @@ final class SafeDeleterTests: XCTestCase {
         XCTAssertEqual(freed, 4_000)
         XCTAssertFalse(FileManager.default.fileExists(atPath: dir.path))
     }
+
+    func test_isWithin_requires_path_boundary_not_just_prefix() {
+        let root = URL(fileURLWithPath: "/Users/x/Library/LaunchAgents")
+        let inside = URL(fileURLWithPath: "/Users/x/Library/LaunchAgents/com.foo.plist")
+        let sibling = URL(fileURLWithPath: "/Users/x/Library/LaunchAgents-Backup/com.foo.plist")
+        XCTAssertTrue(inside.isWithin(root))
+        XCTAssertTrue(root.isWithin(root))          // the root itself counts as within
+        XCTAssertFalse(sibling.isWithin(root))      // the bug: must NOT match
+    }
 }

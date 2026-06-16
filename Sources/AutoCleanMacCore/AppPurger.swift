@@ -120,7 +120,7 @@ public final class AppPurger: Sendable {
             + LeftoverPathProvider.resolveDynamic(bundleID: bundleID, homeDirectory: homeDirectory)
         for url in userLeftovers where fm.fileExists(atPath: url.path) {
             // Unload LaunchAgents zanim usuniemy plist.
-            if url.path.hasPrefix(userLib.appendingPathComponent("LaunchAgents").path) {
+            if url.isWithin(userLib.appendingPathComponent("LaunchAgents")) {
                 _ = launchAgents.unload(plist: url, domain: .userGUI(uid: getuid()))
             }
             do {
@@ -137,8 +137,8 @@ public final class AppPurger: Sendable {
             let systemLeftovers = LeftoverPathProvider.systemPaths(bundleID: bundleID, displayName: displayName, systemRoot: systemRoot)
                 + LeftoverPathProvider.resolveDynamicSystem(bundleID: bundleID, systemRoot: systemRoot)
             for url in systemLeftovers where fm.fileExists(atPath: url.path) {
-                if url.path.hasPrefix(systemLib.appendingPathComponent("LaunchDaemons").path)
-                    || url.path.hasPrefix(systemLib.appendingPathComponent("LaunchAgents").path) {
+                if url.isWithin(systemLib.appendingPathComponent("LaunchDaemons"))
+                    || url.isWithin(systemLib.appendingPathComponent("LaunchAgents")) {
                     _ = launchAgents.unload(plist: url, domain: .system)
                 }
                 let measured = (try? SafeDeleter.recursiveMetrics(at: url).bytesFreed) ?? 0
