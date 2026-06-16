@@ -176,8 +176,10 @@ final class SafeDeleterTests: XCTestCase {
 
         let metrics = try SafeDeleter.recursiveMetrics(at: dir)
 
-        // 2 regular files + 1 symlink counted; symlink NOT followed (999 excluded).
+        // 2 regular files (100 + 50) plus the symlink's own size, which on macOS equals the
+        // byte length of the target path it stores. The symlink is NOT followed (999 excluded).
+        let expectedSymlinkSize = Int64(target.path.utf8.count)
         XCTAssertEqual(metrics.itemsDeleted, 3)
-        XCTAssertEqual(metrics.bytesFreed, 265)   // 100 + 50 + symlink's own link length
+        XCTAssertEqual(metrics.bytesFreed, 150 + expectedSymlinkSize)
     }
 }
