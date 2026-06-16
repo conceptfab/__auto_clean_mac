@@ -119,12 +119,8 @@ public final class SafeDeleter: Sendable {
             for case let child as URL in enumerator {
                 let values = try? child.resourceValues(forKeys: Set(keys))
                 if values?.isDirectory == true { continue }
-                if values?.isSymbolicLink == true {
-                    let linkAttrs = try? fm.attributesOfItem(atPath: child.path)
-                    total += (linkAttrs?[.size] as? Int64) ?? 0
-                    items += 1
-                    continue
-                }
+                // Symlinks and regular files both use the enumerator-prefetched size;
+                // we never follow links (sized by their own link length).
                 total += Int64(values?.fileSize ?? 0)
                 items += 1
             }

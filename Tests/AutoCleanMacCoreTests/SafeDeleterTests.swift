@@ -164,4 +164,20 @@ final class SafeDeleterTests: XCTestCase {
         XCTAssertTrue(URL(fileURLWithPath: "/Users/x/Library/LaunchAgents/com.foo.plist")
             .isWithin(URL(fileURLWithPath: "/Users/x/Library/LaunchAgents/")))
     }
+
+    func test_recursiveMetrics_counts_files_and_symlink_without_following() throws {
+        let dir = tempDir.appendingPathComponent("tree")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Fixtures.makeFile(at: dir.appendingPathComponent("a.txt"), size: 100)
+        try Fixtures.makeFile(at: dir.appendingPathComponent("sub/b.txt"), size: 50)
+        let target = tempDir.appendingPathComponent("outside.txt")
+        try Fixtures.makeFile(at: target, size: 999)
+        try Fixtures.makeSymlink(at: dir.appendingPathComponent("link"), pointingTo: target)
+
+        let metrics = try SafeDeleter.recursiveMetrics(at: dir)
+
+        // 2 regular files + 1 symlink counted; symlink NOT followed (999 excluded).
+        XCTAssertEqual(metrics.itemsDeleted, 3)
+        XCTAssertEqual(metrics.bytesFreed, 265)   // 100 + 50 + symlink's own link length
+    }
 }
