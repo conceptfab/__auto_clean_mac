@@ -123,10 +123,6 @@ struct ScannerTab: View {
             HStack {
                 Button {
                     Task {
-                        // Pobieramy config z settingsModel za pomocą reflection lub przez wymuszenie,
-                        // ale tu możemy po prostu uzyć opcji apply/preview
-                        // Najlepiej dodać metodę currentConfig do publicznego dostępu lub zduplikować logikę.
-                        // Ale czekaj, nie mamy bezpośrednio metody `currentConfig()` dostępnej. Zróbmy w modelu!
                         await viewModel.scan(config: settingsModel.currentConfig())
                     }
                 } label: {

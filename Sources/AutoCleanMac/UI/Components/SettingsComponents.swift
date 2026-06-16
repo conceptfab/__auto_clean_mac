@@ -166,17 +166,6 @@ extension DeleteMode {
         }
     }
 
-    var overviewSummary: String {
-        switch self {
-        case .trash:
-            return "Najbezpieczniejszy tryb codziennego użycia. Czyści to, co wybrałeś, ale zostawia możliwość odzyskania danych z Kosza."
-        case .live:
-            return "Tryb natychmiastowego usuwania. Najbardziej agresywny i najszybszy, ale bez cofnięcia operacji."
-        case .dryRun:
-            return "Tryb podglądu. Pozwala zobaczyć, co zostałoby usunięte, bez ruszania plików."
-        }
-    }
-
     var symbolName: String {
         switch self {
         case .trash:

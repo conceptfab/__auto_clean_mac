@@ -251,7 +251,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     ? "Podgląd zakończony"
                     : "Cleanup zakończony"
                 model.summary = Self.formatSummary(summary, presentation: presentation)
-                model.finished = true
                 window.fadeOutAndClose(holdMs: effectiveConfig.window.holdAfterMs, fadeOutMs: effectiveConfig.window.fadeOutMs) {
                     self.consoleWindow = nil
                     self.isRunning = false
@@ -338,7 +337,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model.skippedCount = 0
         model.lines = []
         model.summary = nil
-        model.finished = false
         model.lifetimeRuns = statistics.totalRuns
         model.lifetimeItemsDeleted = statistics.totalItemsDeleted
         model.lifetimeBytesFreed = statistics.totalBytesFreed
@@ -350,19 +348,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             switch mode {
             case .trash:
                 model.statusBadge = "trash"
-                model.statusColor = .green
             case .live:
                 model.statusBadge = "live"
-                model.statusColor = .orange
             case .dryRun:
                 model.statusBadge = "dry-run"
-                model.statusColor = .blue
             }
         case .preview:
             model.title = "Preview Cleanup"
             model.subtitle = "Symulacja na aktualnych ustawieniach"
             model.statusBadge = "preview"
-            model.statusColor = .blue
         }
     }
 
@@ -388,36 +382,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .first
         if let newest { NSWorkspace.shared.open(newest) }
-    }
-
-    private func openInDefaultEditor(_ url: URL) {
-        if !FileManager.default.fileExists(atPath: url.path) {
-            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let defaultJson = """
-            {
-              "retention_days": 7,
-              "delete_mode": "trash",
-              "reminder": { "interval_hours": 24, "mode": "remind" },
-              "window": { "fade_in_ms": 800, "hold_after_ms": 3000, "fade_out_ms": 800 },
-              "excluded_paths": [],
-              "whitelisted_cache_apps": [],
-              "tasks": {
-                "user_caches": true,
-                "system_temp": true,
-                "trash": true,
-                "ds_store": true,
-                "user_logs": true,
-                "dev_caches": true,
-                "homebrew_cleanup": false,
-                "project_artifacts": false,
-                "downloads": false
-              },
-              "browsers": {}
-            }
-            """
-            try? defaultJson.write(to: url, atomically: true, encoding: .utf8)
-        }
-        NSWorkspace.shared.open(url)
     }
 
     @MainActor

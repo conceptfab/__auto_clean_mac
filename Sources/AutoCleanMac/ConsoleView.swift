@@ -28,7 +28,6 @@ final class ConsoleViewModel: ObservableObject {
     @Published var title: String = "AutoCleanMac"
     @Published var subtitle: String = "Przygotowywanie uruchomienia"
     @Published var statusBadge: String = "cleanup"
-    @Published var statusColor: Color = .green
     @Published var currentTask: String? = nil
     @Published var completedTasks: Int = 0
     @Published var totalTasks: Int = 0
@@ -40,7 +39,6 @@ final class ConsoleViewModel: ObservableObject {
     @Published var lifetimeItemsDeleted: Int = 0
     @Published var lifetimeBytesFreed: Int64 = 0
     @Published var summary: String? = nil
-    @Published var finished: Bool = false
 
     var progressValue: Double {
         guard totalTasks > 0 else { return 0 }
