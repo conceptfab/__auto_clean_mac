@@ -271,7 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .taskStarted(let name):
             model.currentTask = name
             model.subtitle = "Wykonywanie kolejnych kroków"
-            model.lines.append(.init(prefix: "•", text: "\(name)…"))
+            model.appendLine(.init(prefix: "•", text: "\(name)…"))
         case .taskFinished(let name, let result):
             model.completedTasks += 1
             model.warningsCount += result.warnings.count
@@ -282,13 +282,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             if result.skipped {
                 model.skippedCount += 1
-                model.lines.append(.init(prefix: "·", text: "\(name) — pominięte (\(result.skipReason ?? "disabled"))"))
+                model.appendLine(.init(prefix: "·", text: "\(name) — pominięte (\(result.skipReason ?? "disabled"))"))
             } else {
                 let prefix = result.warnings.isEmpty ? "✓" : "⚠"
                 let size = Self.formatBytes(result.bytesFreed)
                 var line = "\(name)  \(size)  ·  \(result.itemsDeleted) plik."
                 if !result.warnings.isEmpty { line += "  (ostrzeżeń: \(result.warnings.count))" }
-                model.lines.append(.init(prefix: prefix, text: line))
+                model.appendLine(.init(prefix: prefix, text: line))
             }
         case .summary:
             break

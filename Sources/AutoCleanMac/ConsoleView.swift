@@ -8,6 +8,17 @@ final class ConsoleViewModel: ObservableObject {
     }
 
     @Published var lines: [Line] = []
+
+    /// Hard cap so a long run can't grow the console buffer without bound.
+    static let maxLines = 500
+
+    func appendLine(_ line: Line) {
+        lines.append(line)
+        if lines.count > Self.maxLines {
+            lines.removeFirst(lines.count - Self.maxLines)
+        }
+    }
+
     @Published var title: String = "AutoCleanMac"
     @Published var subtitle: String = "Przygotowywanie uruchomienia"
     @Published var statusBadge: String = "cleanup"
@@ -106,7 +117,7 @@ struct ConsoleView: View {
 
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 4) {
+                    LazyVStack(alignment: .leading, spacing: 4) {
                         ForEach(model.lines) { line in
                             HStack(alignment: .top, spacing: 6) {
                                 Text(line.prefix)
