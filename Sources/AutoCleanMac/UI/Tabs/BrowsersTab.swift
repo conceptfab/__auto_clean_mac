@@ -4,6 +4,8 @@ import AutoCleanMacCore
 struct BrowsersTab: View {
     @ObservedObject var model: SettingsModel
 
+    // Snapshot of installed browsers, probed once on appear (see `.task` below). Intentionally
+    // does not refresh if the user installs/removes a browser while Settings stays open.
     @State private var installed: [BrowserIdentity] = []
 
     var body: some View {
