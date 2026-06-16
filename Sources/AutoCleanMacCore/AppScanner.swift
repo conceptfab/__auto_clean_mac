@@ -28,7 +28,8 @@ public final class AppScanner: Sendable {
             homeDirectory.appendingPathComponent("Applications")
         ]
         
-        var apps: [AppInfo] = []
+        // Collect all .app bundle URLs first (cheap directory enumeration).
+        var appURLs: [URL] = []
         for dir in dirsToScan {
             guard let enumerator = fm.enumerator(
                 at: dir,
@@ -36,14 +37,32 @@ public final class AppScanner: Sendable {
                 options: [.skipsPackageDescendants, .skipsHiddenFiles]
             ) else { continue }
             guard let files = enumerator.allObjects as? [URL] else { continue }
-            for fileURL in files {
-                if fileURL.pathExtension == "app" {
-                    if let app = await processApp(at: fileURL, homeDirectory: homeDirectory, fileManager: fm) {
-                        apps.append(app)
-                    }
-                }
+            for fileURL in files where fileURL.pathExtension == "app" {
+                appURLs.append(fileURL)
             }
         }
+
+        // Size each bundle concurrently — independent, I/O-bound work. Bounded so we don't
+        // launch an unbounded number of recursive filesystem walks at once. Result is sorted
+        // afterward, so completion order does not affect output.
+        let apps = await withTaskGroup(of: AppInfo?.self) { group -> [AppInfo] in
+            let maxConcurrent = 8
+            var nextIndex = 0
+            func addTaskIfNeeded() {
+                guard nextIndex < appURLs.count else { return }
+                let url = appURLs[nextIndex]
+                nextIndex += 1
+                group.addTask { await self.processApp(at: url, homeDirectory: homeDirectory, fileManager: .default) }
+            }
+            for _ in 0..<min(maxConcurrent, appURLs.count) { addTaskIfNeeded() }
+            var collected: [AppInfo] = []
+            while let result = await group.next() {
+                if let app = result { collected.append(app) }
+                addTaskIfNeeded()
+            }
+            return collected
+        }
+
         return apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
     
