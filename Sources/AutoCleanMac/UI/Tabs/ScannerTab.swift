@@ -50,14 +50,7 @@ final class ScannerViewModel: ObservableObject {
 struct ScannerTab: View {
     @ObservedObject var settingsModel: SettingsModel
     @StateObject private var viewModel = ScannerViewModel()
-    
-    private static let bytesFormatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useAll]
-        formatter.countStyle = .file
-        return formatter
-    }()
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -75,7 +68,7 @@ struct ScannerTab: View {
                     Text(viewModel.totalBytes > 0 ? "Można zwolnić miejsce" : "Twój Mac jest czysty!")
                         .font(.headline)
                     if viewModel.totalBytes > 0 {
-                        Text("\(Self.bytesFormatter.string(fromByteCount: viewModel.totalBytes)) w \(viewModel.totalItems) plikach")
+                        Text("\(ByteFormatting.string(viewModel.totalBytes)) w \(viewModel.totalItems) plikach")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -108,7 +101,7 @@ struct ScannerTab: View {
                                 .font(.body)
                             Spacer()
                             if item.result.bytesFreed > 0 {
-                                Text(Self.bytesFormatter.string(fromByteCount: item.result.bytesFreed))
+                                Text(ByteFormatting.string(item.result.bytesFreed))
                                     .font(.body)
                                     .monospacedDigit()
                             } else {

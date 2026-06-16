@@ -1,4 +1,5 @@
 import SwiftUI
+import AutoCleanMacCore
 
 final class ConsoleViewModel: ObservableObject {
     struct Line: Identifiable {
@@ -50,19 +51,12 @@ final class ConsoleViewModel: ObservableObject {
         totalTasks == 0 ? "Oczekiwanie" : "\(completedTasks)/\(totalTasks) kroków"
     }
 
-    private static let bytesFormatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useAll]
-        formatter.countStyle = .file
-        return formatter
-    }()
-
     var currentRunBytesText: String {
-        Self.bytesFormatter.string(fromByteCount: currentRunBytesFreed)
+        ByteFormatting.string(currentRunBytesFreed)
     }
 
     var lifetimeBytesText: String {
-        Self.bytesFormatter.string(fromByteCount: lifetimeBytesFreed)
+        ByteFormatting.string(lifetimeBytesFreed)
     }
 }
 

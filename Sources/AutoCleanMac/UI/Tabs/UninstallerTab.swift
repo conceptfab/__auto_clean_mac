@@ -45,12 +45,6 @@ struct UninstallerTab: View {
         _viewModel = StateObject(wrappedValue: UninstallerViewModel(homeDirectory: settingsModel.homeDirectory))
     }
     
-    private static let bytesFormatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useAll]
-        formatter.countStyle = .file
-        return formatter
-    }()
     
     var body: some View {
         VStack(spacing: 0) {
@@ -113,10 +107,10 @@ struct UninstallerTab: View {
                         Spacer()
                         
                         VStack(alignment: .trailing) {
-                            Text(Self.bytesFormatter.string(fromByteCount: app.totalSize))
+                            Text(ByteFormatting.string(app.totalSize))
                                 .font(.body)
                             if app.leftoversSize > 0 {
-                                Text("\(Self.bytesFormatter.string(fromByteCount: app.leftoversSize)) resztek")
+                                Text("\(ByteFormatting.string(app.leftoversSize)) resztek")
                                     .font(.caption)
                                     .foregroundStyle(.orange)
                             }
@@ -213,6 +207,6 @@ struct UninstallerTab: View {
     }
 
     private static func formatFreed(_ bytes: Int64) -> String {
-        bytes <= 0 ? "0 KB" : Self.bytesFormatter.string(fromByteCount: bytes)
+        ByteFormatting.string(bytes)
     }
 }

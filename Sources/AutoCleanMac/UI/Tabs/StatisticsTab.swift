@@ -4,15 +4,8 @@ import AutoCleanMacCore
 struct StatisticsTab: View {
     @ObservedObject var model: SettingsModel
 
-    private static let bytesFormatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useAll]
-        formatter.countStyle = .file
-        return formatter
-    }()
-
     private var totalBytesString: String {
-        Self.bytesFormatter.string(fromByteCount: model.statistics.totalBytesFreed)
+        ByteFormatting.string(model.statistics.totalBytesFreed)
     }
 
     private var lastCleanupString: String {
@@ -61,15 +54,8 @@ struct StatisticsTab: View {
 struct CleanupHistoryRow: View {
     let run: CleanupRunRecord
 
-    private static let bytesFormatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useAll]
-        formatter.countStyle = .file
-        return formatter
-    }()
-
     private var bytesString: String {
-        Self.bytesFormatter.string(fromByteCount: run.bytesFreed)
+        ByteFormatting.string(run.bytesFreed)
     }
 
     var body: some View {
