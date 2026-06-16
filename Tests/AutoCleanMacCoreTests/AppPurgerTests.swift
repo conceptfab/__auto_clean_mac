@@ -131,6 +131,7 @@ final class AppPurgerTests: XCTestCase {
         XCTAssertTrue(outcome.appRemoved)
         XCTAssertTrue(outcome.elevatedFallbackUsed)
         XCTAssertGreaterThan(outcome.bytesFreed, 0)
+        XCTAssertGreaterThan(outcome.itemsDeleted, 0)  // elevated path must report freed items, not just bytes
     }
 
     func test_purge_calls_prefs_daemon_in_live_mode() async throws {

@@ -28,6 +28,9 @@ public final class SafeDeleter: Sendable {
         case outsideAllowedRoot(path: String, root: String)
         case excludedPath(path: String)
         case notFound(path: String)
+        /// Thrown when the measure succeeded but the removal (removeItem/trashItem) failed.
+        /// `measured` reflects the bundle size captured BEFORE the (possibly partial) removal —
+        /// not bytes actually freed — so callers can still report the size after an elevated retry.
         case removalFailed(path: String, measured: DeletionMetrics, underlying: Error)
 
         public var description: String {

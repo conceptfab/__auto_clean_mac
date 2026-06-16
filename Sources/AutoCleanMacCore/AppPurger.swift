@@ -92,20 +92,22 @@ public final class AppPurger: Sendable {
             appRemoved = true
         } catch {
             if fm.fileExists(atPath: appURL.path), deleter.mode != .dryRun {
-                // Recover the size deleteMeasured captured BEFORE it attempted (and partially
-                // performed) the removal. removeItem deletes bundle contents before failing on
-                // the parent, so re-measuring here would under-report; the failure carries the
-                // pre-delete metrics for exactly this reason.
-                let measured: Int64
+                let measured: SafeDeleter.DeletionMetrics
                 if case let SafeDeleter.DeletionError.removalFailed(_, m, _) = error {
-                    measured = m.bytesFreed
+                    // removeItem deletes bundle contents before failing on the parent, so
+                    // re-measuring here would under-report; the failure carries the metrics
+                    // captured before the (partial) removal for exactly this reason.
+                    measured = m
                 } else {
-                    measured = (try? SafeDeleter.recursiveMetrics(at: appURL))?.bytesFreed ?? 0
+                    // Pre-deletion errors (e.g. outsideAllowedRoot/notFound) leave the bundle
+                    // intact, so a direct measurement here is accurate.
+                    measured = (try? SafeDeleter.recursiveMetrics(at: appURL)) ?? SafeDeleter.DeletionMetrics(bytesFreed: 0, itemsDeleted: 0)
                 }
                 do {
                     try await elevatedRemove(appURL)
                     if !fm.fileExists(atPath: appURL.path) {
-                        bytes += measured
+                        bytes += measured.bytesFreed
+                        items += measured.itemsDeleted
                         appRemoved = true
                         elevatedUsed = true
                     } else {
