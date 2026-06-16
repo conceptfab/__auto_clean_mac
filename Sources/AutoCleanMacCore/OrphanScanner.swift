@@ -39,17 +39,19 @@ public struct OrphanScanner: Sendable {
         self.minimumAgeDays = max(0, minimumAgeDays)
     }
 
-    public func scan(homeDirectory: URL, installedBundleIDs: Set<String>) -> [OrphanGroup] {
+    public func scan(homeDirectory: URL, installedBundleIDs: Set<String>) async -> [OrphanGroup] {
         let lib = homeDirectory.appendingPathComponent("Library")
-        var byID: [String: [OrphanPath]] = [:]
 
-        // Skanowane lokalizacje (basename → bundle ID).
+        // Phase 1 — discovery (cheap: directory listings, name filtering, age check). No sizing yet.
+        // Candidates are collected in scan order so within-group path ordering is preserved.
+        var candidates: [(bundleID: String, url: URL)] = []
+
         let plistDirs: [(URL, suffix: String)] = [
             (lib.appendingPathComponent("Preferences"), ".plist"),
             (lib.appendingPathComponent("Cookies"), ".binarycookies"),
         ]
         for (dir, suffix) in plistDirs {
-            collectFiles(in: dir, suffix: suffix, into: &byID, installed: installedBundleIDs)
+            discoverFiles(in: dir, suffix: suffix, into: &candidates, installed: installedBundleIDs)
         }
 
         // Katalogi nazwane bundle ID.
@@ -63,21 +65,47 @@ public struct OrphanScanner: Sendable {
             lib.appendingPathComponent("WebKit"),
         ]
         for root in dirRoots {
-            collectDirectories(in: root, into: &byID, installed: installedBundleIDs)
+            discoverDirectories(in: root, into: &candidates, installed: installedBundleIDs)
         }
 
         // Saved Application State – `<id>.savedState`.
-        collectFiles(in: lib.appendingPathComponent("Saved Application State"), suffix: ".savedState", into: &byID, installed: installedBundleIDs)
+        discoverFiles(in: lib.appendingPathComponent("Saved Application State"), suffix: ".savedState", into: &candidates, installed: installedBundleIDs)
+
+        // Phase 2 — size each candidate concurrently (bounded), preserving discovery order by index.
+        let sizes: [Int64] = await withTaskGroup(of: (Int, Int64).self) { group -> [Int64] in
+            let maxConcurrent = 8
+            var nextIndex = 0
+            func addTaskIfNeeded() {
+                guard nextIndex < candidates.count else { return }
+                let i = nextIndex
+                let url = candidates[i].url
+                nextIndex += 1
+                group.addTask { (i, (try? SafeDeleter.recursiveMetrics(at: url).bytesFreed) ?? 0) }
+            }
+            for _ in 0..<min(maxConcurrent, candidates.count) { addTaskIfNeeded() }
+            var buffer = [Int64](repeating: 0, count: candidates.count)
+            while let (i, bytes) = await group.next() {
+                buffer[i] = bytes
+                addTaskIfNeeded()
+            }
+            return buffer
+        }
+
+        // Phase 3 — group by bundle ID in discovery order, then sort groups by size.
+        var byID: [String: [OrphanPath]] = [:]
+        for (i, candidate) in candidates.enumerated() {
+            byID[candidate.bundleID, default: []].append(OrphanPath(url: candidate.url, bytes: sizes[i]))
+        }
 
         return byID
             .map { OrphanGroup(bundleID: $0.key, paths: $0.value) }
             .sorted { $0.totalBytes > $1.totalBytes }
     }
 
-    private func collectFiles(
+    private func discoverFiles(
         in dir: URL,
         suffix: String,
-        into byID: inout [String: [OrphanPath]],
+        into candidates: inout [(bundleID: String, url: URL)],
         installed: Set<String>
     ) {
         let fm = FileManager.default
@@ -88,14 +116,13 @@ public struct OrphanScanner: Sendable {
             guard isCandidateOrphan(bundleID: bundleID, installed: installed) else { continue }
             let url = dir.appendingPathComponent(name)
             guard isOldEnough(url) else { continue }
-            let bytes = (try? SafeDeleter.recursiveMetrics(at: url).bytesFreed) ?? 0
-            byID[bundleID, default: []].append(OrphanPath(url: url, bytes: bytes))
+            candidates.append((bundleID, url))
         }
     }
 
-    private func collectDirectories(
+    private func discoverDirectories(
         in root: URL,
-        into byID: inout [String: [OrphanPath]],
+        into candidates: inout [(bundleID: String, url: URL)],
         installed: Set<String>
     ) {
         let fm = FileManager.default
@@ -106,8 +133,7 @@ public struct OrphanScanner: Sendable {
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else { continue }
             guard isOldEnough(url) else { continue }
-            let bytes = (try? SafeDeleter.recursiveMetrics(at: url).bytesFreed) ?? 0
-            byID[name, default: []].append(OrphanPath(url: url, bytes: bytes))
+            candidates.append((name, url))
         }
     }
 

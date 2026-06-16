@@ -571,7 +571,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         searchRoots: InstalledAppRegistry.defaultSearchRoots(homeDirectory: home)
                     )
                     installed.formUnion(running)
-                    return OrphanScanner().scan(homeDirectory: home, installedBundleIDs: installed)
+                    return await OrphanScanner().scan(homeDirectory: home, installedBundleIDs: installed)
                 }.value
             },
             onRemoveOrphans: { [weak self] groups, mode in
