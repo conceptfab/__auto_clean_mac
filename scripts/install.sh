@@ -6,7 +6,7 @@ cd "$REPO_ROOT"
 
 APP_NAME="AutoCleanMac"
 BUNDLE_ID="com.micz.autocleanmac"
-INSTALL_DIR="$HOME/Applications"
+INSTALL_DIR="/Applications"
 APP_DEST="$INSTALL_DIR/$APP_NAME.app"
 LAUNCH_AGENT="$HOME/Library/LaunchAgents/$BUNDLE_ID.plist"
 CONFIG_DIR="$HOME/.config/autoclean-mac"

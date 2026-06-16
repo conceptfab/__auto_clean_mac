@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BUNDLE_ID="com.micz.autocleanmac"
-APP_DEST="$HOME/Applications/AutoCleanMac.app"
+APP_DEST="/Applications/AutoCleanMac.app"
 LAUNCH_AGENT="$HOME/Library/LaunchAgents/$BUNDLE_ID.plist"
 CONFIG_DIR="$HOME/.config/autoclean-mac"
 LOGS_DIR="$HOME/Library/Logs/AutoCleanMac"

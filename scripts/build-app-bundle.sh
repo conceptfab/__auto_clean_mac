@@ -17,6 +17,9 @@ MENU_SOURCE="$REPO_ROOT/Sources/AutoCleanMacMenuObjC/main.m"
 MENU_EXECUTABLE="$BUILD_DIR/AutoCleanMacMenuObjC"
 UI_EXECUTABLE="AutoCleanMacUI"
 OUT_DIR="$REPO_ROOT/.build/bundle"
+DIST_DIR="$REPO_ROOT/dist"
+DMG_PATH="$DIST_DIR/$APP_NAME-$VERSION.dmg"
+DMG_STAGING="$OUT_DIR/dmg-staging"
 APP_DIR="$OUT_DIR/$APP_NAME.app"
 MACOS_DIR="$APP_DIR/Contents/MacOS"
 RESOURCES_DIR="$APP_DIR/Contents/Resources"
@@ -71,4 +74,20 @@ EOF
 echo "→ ad-hoc codesign"
 codesign --force --sign - "$APP_DIR"
 
-echo "→ done: $APP_DIR"
+echo "→ packaging DMG (drag-to-install)"
+mkdir -p "$DIST_DIR"
+rm -rf "$DMG_STAGING"
+mkdir -p "$DMG_STAGING"
+cp -R "$APP_DIR" "$DMG_STAGING/"
+ln -s /Applications "$DMG_STAGING/Applications"
+rm -f "$DMG_PATH"
+hdiutil create \
+    -volname "$APP_NAME" \
+    -srcfolder "$DMG_STAGING" \
+    -ov -format UDZO \
+    "$DMG_PATH"
+rm -rf "$DMG_STAGING"
+
+echo "→ done:"
+echo "   app: $APP_DIR"
+echo "   dmg: $DMG_PATH"
