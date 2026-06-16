@@ -24,6 +24,7 @@ public enum DeleteMode: String, Equatable {
     }
 
     /// Canonical JSON/log string. Inverse of `parse(_:)`.
+    /// Must stay in sync with `SafeDeleter.Mode.label`.
     public var jsonValue: String {
         switch self {
         case .trash:  return "trash"

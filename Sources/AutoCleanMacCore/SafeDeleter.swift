@@ -15,6 +15,7 @@ public final class SafeDeleter: Sendable {
         case live, dryRun, trash
 
         /// Canonical log/serialization string.
+        /// Must stay in sync with `DeleteMode.jsonValue`.
         public var label: String {
             switch self {
             case .live:   return "live"
@@ -24,7 +25,7 @@ public final class SafeDeleter: Sendable {
         }
     }
 
-    public enum DeletionError: Error, CustomStringConvertible {
+    public enum DeletionError: Error, CustomStringConvertible, LocalizedError {
         case outsideAllowedRoot(path: String, root: String)
         case excludedPath(path: String)
         case notFound(path: String)
@@ -41,6 +42,8 @@ public final class SafeDeleter: Sendable {
             case .removalFailed(let p, _, let underlying): return "Removal failed for \(p): \(underlying)"
             }
         }
+
+        public var errorDescription: String? { description }
     }
 
     public let mode: Mode

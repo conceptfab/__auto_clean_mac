@@ -204,4 +204,17 @@ final class SafeDeleterTests: XCTestCase {
             XCTAssertEqual(measured.itemsDeleted, 1)
         }
     }
+
+    func test_deletionError_bridges_to_descriptive_localizedDescription() {
+        let err = SafeDeleter.DeletionError.removalFailed(
+            path: "/tmp/x",
+            measured: SafeDeleter.DeletionMetrics(bytesFreed: 10, itemsDeleted: 1),
+            underlying: SafeDeleter.DeletionError.notFound(path: "/tmp/x")
+        )
+        // Bridged NSError.localizedDescription must be the descriptive message, not the
+        // generic "operation couldn't be completed" Foundation fallback.
+        let bridged = (err as NSError).localizedDescription
+        XCTAssertTrue(bridged.contains("Removal failed for /tmp/x"), "got: \(bridged)")
+        XCTAssertFalse(bridged.contains("couldn't be completed"), "got generic fallback: \(bridged)")
+    }
 }
