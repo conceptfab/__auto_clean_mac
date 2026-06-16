@@ -28,12 +28,14 @@ public final class SafeDeleter: Sendable {
         case outsideAllowedRoot(path: String, root: String)
         case excludedPath(path: String)
         case notFound(path: String)
+        case removalFailed(path: String, measured: DeletionMetrics, underlying: Error)
 
         public var description: String {
             switch self {
             case .outsideAllowedRoot(let p, let r): return "Path \(p) escapes root \(r)"
             case .excludedPath(let p):              return "Excluded path: \(p)"
             case .notFound(let p):                  return "Not found: \(p)"
+            case .removalFailed(let p, _, let underlying): return "Removal failed for \(p): \(underlying)"
             }
         }
     }
@@ -87,10 +89,18 @@ public final class SafeDeleter: Sendable {
         case .dryRun:
             break
         case .live:
-            try FileManager.default.removeItem(at: path)
+            do {
+                try FileManager.default.removeItem(at: path)
+            } catch {
+                throw DeletionError.removalFailed(path: path.path, measured: metrics, underlying: error)
+            }
         case .trash:
             var resulting: NSURL? = nil
-            try FileManager.default.trashItem(at: path, resultingItemURL: &resulting)
+            do {
+                try FileManager.default.trashItem(at: path, resultingItemURL: &resulting)
+            } catch {
+                throw DeletionError.removalFailed(path: path.path, measured: metrics, underlying: error)
+            }
             if let dst = resulting as URL? {
                 logger.log(event: "trash_dst", fields: ["path": path.path, "dst": dst.path])
             }

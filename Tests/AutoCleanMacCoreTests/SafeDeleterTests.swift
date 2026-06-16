@@ -182,4 +182,26 @@ final class SafeDeleterTests: XCTestCase {
         XCTAssertEqual(metrics.itemsDeleted, 3)
         XCTAssertEqual(metrics.bytesFreed, 150 + expectedSymlinkSize)
     }
+
+    func test_deleteMeasured_throws_removalFailed_carrying_measured_bytes() throws {
+        // chmod-based permission simulation is meaningless when running as root.
+        try XCTSkipIf(getuid() == 0, "permission test requires non-root")
+        let root = tempDir.appendingPathComponent("root")
+        let bundle = root.appendingPathComponent("app")
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        try Fixtures.makeFile(at: bundle.appendingPathComponent("contents"), size: 80)
+        // Make the parent read-only so unlinking `bundle` fails, but its contents delete first.
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: root.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: root.path) }
+
+        let deleter = SafeDeleter(mode: .live, logger: logger)
+        XCTAssertThrowsError(try deleter.deleteMeasured(bundle, withinRoot: root)) { error in
+            guard case let SafeDeleter.DeletionError.removalFailed(_, measured, _) = error else {
+                return XCTFail("Expected removalFailed, got \(error)")
+            }
+            // Bytes were captured BEFORE the partial delete — must reflect the full 80, not 0.
+            XCTAssertEqual(measured.bytesFreed, 80)
+            XCTAssertEqual(measured.itemsDeleted, 1)
+        }
+    }
 }
