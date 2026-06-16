@@ -11,7 +11,18 @@ public final class SafeDeleter: Sendable {
         }
     }
 
-    public enum Mode: Sendable { case live, dryRun, trash }
+    public enum Mode: Sendable {
+        case live, dryRun, trash
+
+        /// Canonical log/serialization string.
+        public var label: String {
+            switch self {
+            case .live:   return "live"
+            case .dryRun: return "dry_run"
+            case .trash:  return "trash"
+            }
+        }
+    }
 
     public enum DeletionError: Error, CustomStringConvertible {
         case outsideAllowedRoot(path: String, root: String)

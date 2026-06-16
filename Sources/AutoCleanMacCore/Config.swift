@@ -13,6 +13,24 @@ public enum DeleteMode: String, Equatable {
         default:         return nil
         }
     }
+
+    /// Runtime deletion mode used by `SafeDeleter`.
+    public var safeDeleterMode: SafeDeleter.Mode {
+        switch self {
+        case .trash:  return .trash
+        case .live:   return .live
+        case .dryRun: return .dryRun
+        }
+    }
+
+    /// Canonical JSON/log string. Inverse of `parse(_:)`.
+    public var jsonValue: String {
+        switch self {
+        case .trash:  return "trash"
+        case .live:   return "live"
+        case .dryRun: return "dry_run"
+        }
+    }
 }
 
 public enum ReminderMode: String, Equatable {

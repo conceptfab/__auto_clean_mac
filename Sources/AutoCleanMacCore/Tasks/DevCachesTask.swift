@@ -162,14 +162,7 @@ public struct DevCachesTask: CleanupTask {
     }
 
     private static func deletionModeLabel(_ mode: SafeDeleter.Mode) -> String {
-        switch mode {
-        case .dryRun:
-            return "dry_run"
-        case .live:
-            return "live"
-        case .trash:
-            return "trash"
-        }
+        mode.label
     }
 
     private static func findExecutable(_ name: String) -> String? {

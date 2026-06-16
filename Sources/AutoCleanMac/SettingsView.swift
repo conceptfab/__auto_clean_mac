@@ -89,7 +89,7 @@ final class SettingsModel: ObservableObject {
     func removeSelectedOrphans() async {
         let chosen = orphans.filter { selectedOrphans.contains($0.id) }
         guard !chosen.isEmpty else { return }
-        _ = await onRemoveOrphans(chosen, deleteMode == .live ? .live : .trash)
+        _ = await onRemoveOrphans(chosen, deleteMode.safeDeleterMode)
         await scanOrphans()
     }
 

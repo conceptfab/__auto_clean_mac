@@ -200,19 +200,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let mode: SafeDeleter.Mode = {
             if let forcedMode { return forcedMode }
             if ProcessInfo.processInfo.environment["AUTOCLEANMAC_DRY_RUN"] != nil { return .dryRun }
-            switch effectiveConfig.deleteMode {
-            case .trash:  return .trash
-            case .live:   return .live
-            case .dryRun: return .dryRun
-            }
+            return effectiveConfig.deleteMode.safeDeleterMode
         }()
-        let modeString: String
-        switch mode {
-        case .live:   modeString = "live"
-        case .dryRun: modeString = "dry_run"
-        case .trash:  modeString = "trash"
-        }
-        logger.log(event: "mode", fields: ["mode": modeString])
+        logger.log(event: "mode", fields: ["mode": mode.label])
         let deleter = SafeDeleter(mode: mode, logger: logger)
         let ctx = CleanupContext(
             retentionDays: effectiveConfig.retentionDays,

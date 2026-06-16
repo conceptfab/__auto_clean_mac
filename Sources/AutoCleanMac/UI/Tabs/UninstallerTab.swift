@@ -173,12 +173,7 @@ struct UninstallerTab: View {
         
         let toUninstall = viewModel.apps.filter { viewModel.selectedAppIDs.contains($0.id) }
         
-        let safeDeleterMode: SafeDeleter.Mode
-        switch settingsModel.deleteMode {
-        case .live: safeDeleterMode = .live
-        case .dryRun: safeDeleterMode = .dryRun
-        case .trash: safeDeleterMode = .trash
-        }
+        let safeDeleterMode = settingsModel.deleteMode.safeDeleterMode
         
         let outcome = await settingsModel.onUninstall(toUninstall, safeDeleterMode)
         let attempted = toUninstall.count
