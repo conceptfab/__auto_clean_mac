@@ -562,33 +562,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 return UninstallOutcome(freedBytes: freed, succeeded: succeeded, failures: failures)
             },
             onScanOrphans: {
-                var installed = InstalledAppRegistry().installedBundleIDs(
-                    searchRoots: InstalledAppRegistry.defaultSearchRoots(homeDirectory: home)
-                )
-                installed.formUnion(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
-                return OrphanScanner().scan(homeDirectory: home, installedBundleIDs: installed)
+                let running = NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)
+                return await Task.detached(priority: .userInitiated) {
+                    var installed = InstalledAppRegistry().installedBundleIDs(
+                        searchRoots: InstalledAppRegistry.defaultSearchRoots(homeDirectory: home)
+                    )
+                    installed.formUnion(running)
+                    return OrphanScanner().scan(homeDirectory: home, installedBundleIDs: installed)
+                }.value
             },
             onRemoveOrphans: { [weak self] groups, mode in
                 guard let self else { return UninstallOutcome(freedBytes: 0, succeeded: 0, failures: []) }
-                let deleter = SafeDeleter(mode: mode, logger: self.logger)
-                let userLib = home.appendingPathComponent("Library")
-                var freed: Int64 = 0
-                var succeeded = 0
-                var failures: [UninstallFailure] = []
-                for group in groups {
-                    var groupOk = true
-                    for path in group.paths where FileManager.default.fileExists(atPath: path.url.path) {
-                        do {
-                            let metrics = try deleter.deleteMeasured(path.url, withinRoot: userLib)
-                            freed += metrics.bytesFreed
-                        } catch {
-                            groupOk = false
-                            failures.append(UninstallFailure(appName: group.bundleID, reason: (error as NSError).localizedDescription))
+                let logger: Logger = self.logger
+                return await Task.detached(priority: .userInitiated) {
+                    let deleter = SafeDeleter(mode: mode, logger: logger)
+                    let userLib = home.appendingPathComponent("Library")
+                    var freed: Int64 = 0
+                    var succeeded = 0
+                    var failures: [UninstallFailure] = []
+                    for group in groups {
+                        var groupOk = true
+                        for path in group.paths where FileManager.default.fileExists(atPath: path.url.path) {
+                            do {
+                                let metrics = try deleter.deleteMeasured(path.url, withinRoot: userLib)
+                                freed += metrics.bytesFreed
+                            } catch {
+                                groupOk = false
+                                failures.append(UninstallFailure(appName: group.bundleID, reason: (error as NSError).localizedDescription))
+                            }
                         }
+                        if groupOk { succeeded += 1 }
                     }
-                    if groupOk { succeeded += 1 }
-                }
-                return UninstallOutcome(freedBytes: freed, succeeded: succeeded, failures: failures)
+                    return UninstallOutcome(freedBytes: freed, succeeded: succeeded, failures: failures)
+                }.value
             }
         )
         let host = NSHostingController(rootView: SettingsView(model: model))
