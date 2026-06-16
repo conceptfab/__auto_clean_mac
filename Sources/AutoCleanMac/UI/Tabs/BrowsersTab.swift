@@ -4,9 +4,7 @@ import AutoCleanMacCore
 struct BrowsersTab: View {
     @ObservedObject var model: SettingsModel
 
-    private var installed: [BrowserIdentity] {
-        BrowserIdentity.allCases.filter { $0.isInstalled() }
-    }
+    @State private var installed: [BrowserIdentity] = []
 
     var body: some View {
         Form {
@@ -72,5 +70,10 @@ struct BrowsersTab: View {
             }
         }
         .formStyle(.grouped)
+        .task {
+            if installed.isEmpty {
+                installed = BrowserIdentity.allCases.filter { $0.isInstalled() }
+            }
+        }
     }
 }

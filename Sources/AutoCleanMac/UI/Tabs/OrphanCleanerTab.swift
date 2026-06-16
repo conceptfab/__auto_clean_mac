@@ -4,6 +4,13 @@ import AutoCleanMacCore
 struct OrphanCleanerTab: View {
     @ObservedObject var settingsModel: SettingsModel
 
+    private static let bytesFormatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useAll]
+        formatter.countStyle = .file
+        return formatter
+    }()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -37,7 +44,7 @@ struct OrphanCleanerTab: View {
                                         .lineLimit(1)
                                         .truncationMode(.middle)
                                     Spacer()
-                                    Text(ByteCountFormatter().string(fromByteCount: path.bytes))
+                                    Text(Self.bytesFormatter.string(fromByteCount: path.bytes))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
