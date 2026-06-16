@@ -46,7 +46,6 @@ final class ScannerViewModel: ObservableObject {
     }
 }
 
-
 struct ScannerTab: View {
     @ObservedObject var settingsModel: SettingsModel
     @StateObject private var viewModel = ScannerViewModel()

@@ -10,6 +10,9 @@ public enum ByteFormatting {
     }()
 
     public static func string(_ bytes: Int64) -> String {
-        formatter.string(fromByteCount: bytes)
+        // ByteCountFormatter renders 0 as the English "Zero KB", which reads wrong in the
+        // app's Polish UI. Use a language-neutral "0 KB" for non-positive sizes.
+        guard bytes > 0 else { return "0 KB" }
+        return formatter.string(fromByteCount: bytes)
     }
 }

@@ -7,7 +7,11 @@ final class ByteFormattingTests: XCTestCase {
         XCTAssertEqual(ByteFormatting.string(1_000), "1 KB")
     }
 
-    func test_zero_is_stable() {
-        XCTAssertEqual(ByteFormatting.string(0), ByteFormatting.string(0))
+    func test_zero_renders_as_neutral_kb() {
+        XCTAssertEqual(ByteFormatting.string(0), "0 KB")
+    }
+
+    func test_negative_is_clamped_to_zero() {
+        XCTAssertEqual(ByteFormatting.string(-1), "0 KB")
     }
 }
