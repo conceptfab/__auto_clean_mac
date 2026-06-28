@@ -281,7 +281,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             if result.skipped {
                 model.skippedCount += 1
-                model.appendLine(.init(prefix: "·", text: "\(name) — pominięte (\(result.skipReason ?? "disabled"))"))
+                let reason = Self.localizedSkipReason(result.skipReason)
+                model.appendLine(.init(prefix: "·", text: "\(name) — pominięte (\(reason))"))
             } else {
                 let prefix = result.warnings.isEmpty ? "✓" : "⚠"
                 let size = Self.formatBytes(result.bytesFreed)
@@ -320,6 +321,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private static func formatBytes(_ bytes: Int64) -> String {
         ByteFormatting.string(bytes)
+    }
+
+    private static func localizedSkipReason(_ skipReason: String?) -> String {
+        switch skipReason {
+        case "full_disk_access_required":
+            return "wymaga Full Disk Access"
+        case "browser running":
+            return "przeglądarka ma otwarte okna"
+        case "no browser profile directories":
+            return "brak katalogów profilu"
+        case "disabled":
+            return "wyłączone"
+        default:
+            return skipReason ?? "disabled"
+        }
     }
 
     private func configure(

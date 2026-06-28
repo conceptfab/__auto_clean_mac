@@ -20,27 +20,51 @@ public enum BrowserIdentity: String, CaseIterable, Equatable, Hashable {
         }
     }
 
-    /// Katalogi w których leżą profile przeglądarki (każdy profil to podkatalog, np. "Default", "Profile 1").
-    public func profileRoots(homeDirectory: URL) -> [URL] {
+    /// Korzenie profili w `~/Library/Application Support/…` (historia, ciasteczka, sesje).
+    public func applicationSupportProfileRoots(homeDirectory: URL) -> [URL] {
         let appSupport = homeDirectory.appendingPathComponent("Library/Application Support")
-        let caches     = homeDirectory.appendingPathComponent("Library/Caches")
         switch self {
         case .chrome:  return [appSupport.appendingPathComponent("Google/Chrome")]
-        case .firefox:
-            return [
-                appSupport.appendingPathComponent("Firefox/Profiles"),
-                caches.appendingPathComponent("Firefox/Profiles"),
-            ]
+        case .firefox: return [appSupport.appendingPathComponent("Firefox/Profiles")]
         case .edge:    return [appSupport.appendingPathComponent("Microsoft Edge")]
         case .brave:   return [appSupport.appendingPathComponent("BraveSoftware/Brave-Browser")]
         case .vivaldi: return [appSupport.appendingPathComponent("Vivaldi")]
         case .arc:     return [appSupport.appendingPathComponent("Arc/User Data")]
-        case .safari:  return [homeDirectory] // Safari nie ma klasycznych profili w jednym podkatalogu
+        case .safari:  return [homeDirectory]
         case .comet:   return [
             appSupport.appendingPathComponent("Comet"),
-            appSupport.appendingPathComponent("Perplexity/Comet")
+            appSupport.appendingPathComponent("Perplexity/Comet"),
         ]
         }
+    }
+
+    /// Korzenie profili w `~/Library/Caches/…` (głównie `Cache` / `Code Cache` Chromium).
+    public func cachesProfileRoots(homeDirectory: URL) -> [URL] {
+        let caches = homeDirectory.appendingPathComponent("Library/Caches")
+        switch self {
+        case .chrome:  return [caches.appendingPathComponent("Google/Chrome")]
+        case .firefox: return [caches.appendingPathComponent("Firefox/Profiles")]
+        case .edge:    return [caches.appendingPathComponent("Microsoft Edge")]
+        case .brave:   return [caches.appendingPathComponent("BraveSoftware/Brave-Browser")]
+        case .vivaldi: return [caches.appendingPathComponent("Vivaldi")]
+        case .arc:     return [caches.appendingPathComponent("Arc/User Data")]
+        case .safari:  return []
+        case .comet:   return [
+            caches.appendingPathComponent("Comet"),
+            caches.appendingPathComponent("Perplexity/Comet"),
+        ]
+        }
+    }
+
+    /// Katalogi w których leżą profile przeglądarki (każdy profil to podkatalog, np. "Default", "Profile 1").
+    ///
+    /// Uwaga macOS: przeglądarki Chromium trzymają dane w DWÓCH miejscach:
+    /// - `~/Library/Application Support/<vendor>/` — cookies, historia, GPUCache,
+    /// - `~/Library/Caches/<vendor>/`             — główny `Cache` i `Code Cache`.
+    /// Dlatego dla Chromium zwracamy oba korzenie (jak Firefox), inaczej cache nigdy nie jest czyszczony.
+    public func profileRoots(homeDirectory: URL) -> [URL] {
+        applicationSupportProfileRoots(homeDirectory: homeDirectory)
+            + cachesProfileRoots(homeDirectory: homeDirectory)
     }
 
     /// Bundle identifiery do wykrywania czy przeglądarka jest uruchomiona (NSRunningApplication)
@@ -129,6 +153,10 @@ public enum BrowserDataType: String, CaseIterable, Equatable, Hashable {
             return "Firefox: bezpieczny wariant. Czyści autofill i historię pobrań, ale zachowuje places.sqlite z zakładkami."
         case (.safari, _):
             return "Wymaga Pełnego dostępu do dysku (Full Disk Access) ze względów bezpieczeństwa macOS."
+        case (.brave, .cache), (.chrome, .cache), (.edge, .cache):
+            return nil
+        case (.brave, _), (.chrome, _), (.edge, _):
+            return "Na nowym macOS wymaga Pełnego dostępu do dysku (Full Disk Access) — dane profilu są w Application Support."
         case (_, .cookies):
             return "Ciasteczka zwykle wylogowują z serwisów."
         case (_, .history):

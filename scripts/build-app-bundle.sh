@@ -71,8 +71,14 @@ cat > "$APP_DIR/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
-echo "→ ad-hoc codesign"
-codesign --force --sign - "$APP_DIR"
+echo "→ ad-hoc codesign (obie binarki + bundle, spójnie dla TCC/Full Disk Access)"
+# Najpierw zagnieżdżona binarka UI (to ona czyści pliki — TCC sprawdza jej tożsamość),
+# potem główna binarka i cały bundle. Bez tego Full Disk Access nadane bundlowi
+# nie obejmuje procesu czyszczącego uruchamianego przez NSTask.
+codesign --force --sign - --timestamp=none "$MACOS_DIR/$UI_EXECUTABLE"
+codesign --force --sign - --timestamp=none "$MACOS_DIR/$APP_NAME"
+codesign --force --deep --sign - --timestamp=none "$APP_DIR"
+codesign --verify --deep --strict "$APP_DIR" && echo "   codesign OK"
 
 echo "→ packaging DMG (drag-to-install)"
 mkdir -p "$DIST_DIR"

@@ -51,6 +51,67 @@ final class BrowserDataTaskTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: outside.path))
     }
 
+    func test_chromium_cache_deletes_under_Library_Caches_root() async throws {
+        // Na macOS realny cache Chromium leży w ~/Library/Caches/<vendor>/<profil>/, NIE w Application Support.
+        let cachesBase = tempDir.appendingPathComponent("Library/Caches/BraveSoftware/Brave-Browser")
+        let defaultCache = cachesBase.appendingPathComponent("Default/Cache/data_1")
+        let defaultCode  = cachesBase.appendingPathComponent("Default/Code Cache/js/x.bin")
+        try Fixtures.makeFile(at: defaultCache, size: 1000)
+        try Fixtures.makeFile(at: defaultCode,  size: 500)
+
+        // Dane w Application Support (cookies) muszą pozostać nietknięte przy czyszczeniu cache.
+        let appSupport = tempDir.appendingPathComponent("Library/Application Support/BraveSoftware/Brave-Browser/Default")
+        try Fixtures.makeFile(at: appSupport.appendingPathComponent("Cookies"), size: 999)
+
+        let task = BrowserDataTask(browser: .brave, dataType: .cache, isEnabled: true, isBrowserRunning: { _ in false })
+        let result = await task.run(context: context())
+
+        XCTAssertEqual(result.bytesFreed, 1500)
+        XCTAssertFalse(result.skipped)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: defaultCache.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: defaultCode.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: appSupport.appendingPathComponent("Cookies").path))
+    }
+
+    func test_permission_denied_on_profile_root_skips_with_full_disk_access_reason() async throws {
+        // Symuluje ochronę TCC na nowym macOS: katalog profilu istnieje, ale nie da się go odczytać.
+        try XCTSkipIf(getuid() == 0, "root omija uprawnienia POSIX — test nieistotny jako root")
+
+        let root = tempDir.appendingPathComponent("Library/Application Support/BraveSoftware/Brave-Browser")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: root.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: root.path) }
+
+        let task = BrowserDataTask(browser: .brave, dataType: .cookies, isEnabled: true, isBrowserRunning: { _ in false })
+        let result = await task.run(context: context())
+
+        XCTAssertTrue(result.skipped)
+        XCTAssertEqual(result.skipReason, "full_disk_access_required")
+        XCTAssertTrue(
+            result.warnings.contains { $0.localizedCaseInsensitiveContains("Full Disk Access") },
+            "oczekiwano ostrzeżenia kierującego do Full Disk Access, otrzymano: \(result.warnings)"
+        )
+    }
+
+    func test_chromium_cache_still_cleans_from_caches_when_application_support_is_blocked() async throws {
+        try XCTSkipIf(getuid() == 0, "root omija uprawnienia POSIX — test nieistotny jako root")
+
+        let appSupportRoot = tempDir.appendingPathComponent("Library/Application Support/BraveSoftware/Brave-Browser")
+        try FileManager.default.createDirectory(at: appSupportRoot, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: appSupportRoot.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: appSupportRoot.path) }
+
+        let cacheFile = tempDir.appendingPathComponent("Library/Caches/BraveSoftware/Brave-Browser/Default/Cache/data.bin")
+        try Fixtures.makeFile(at: cacheFile, size: 500)
+
+        let task = BrowserDataTask(browser: .brave, dataType: .cache, isEnabled: true, isBrowserRunning: { _ in false })
+        let result = await task.run(context: context())
+
+        XCTAssertFalse(result.skipped)
+        XCTAssertEqual(result.bytesFreed, 500)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: cacheFile.path))
+    }
+
     func test_skips_when_no_profile_root_exists() async throws {
         // brak żadnego katalogu Chrome w tempDir
         let task = BrowserDataTask(browser: .chrome, dataType: .cache, isEnabled: true, isBrowserRunning: { _ in false })
@@ -141,6 +202,40 @@ final class BrowserDataTaskTests: XCTestCase {
         XCTAssertTrue (FileManager.default.fileExists(atPath: profile.appendingPathComponent("places.sqlite").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("formhistory.sqlite").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("downloads.sqlite").path))
+    }
+
+    func test_chrome_history_scrubs_session_restore_from_preferences() async throws {
+        let profile = tempDir.appendingPathComponent("Library/Application Support/Google/Chrome/Default")
+        let prefsURL = profile.appendingPathComponent("Preferences")
+        let securePrefsURL = profile.appendingPathComponent("Secure Preferences")
+        let prefs: [String: Any] = [
+            "sessions": ["event_log": [["type": 2, "tab_count": 1]], "session_data_status": 1],
+            "saved_tab_groups": ["deleted_group_ids": [:]],
+            "profile": ["exit_type": "CrashedOnlyOnce", "name": "Person 1"],
+            "browser": ["window_placement": ["left": 0]],
+            "brave": ["sessions": ["save_version": 1]],
+        ]
+        let securePrefs: [String: Any] = [
+            "sessions": ["event_log": []],
+            "profile": ["exit_type": "Crashed"],
+        ]
+        try FileManager.default.createDirectory(at: profile, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: prefs).write(to: prefsURL)
+        try JSONSerialization.data(withJSONObject: securePrefs).write(to: securePrefsURL)
+
+        let task = BrowserDataTask(browser: .chrome, dataType: .history, isEnabled: true, isBrowserRunning: { _ in false })
+        _ = await task.run(context: context())
+
+        let scrubbed = try JSONSerialization.jsonObject(with: Data(contentsOf: prefsURL)) as! [String: Any]
+        XCTAssertNil(scrubbed["sessions"])
+        XCTAssertNil(scrubbed["saved_tab_groups"])
+        XCTAssertEqual((scrubbed["profile"] as? [String: Any])?["exit_type"] as? String, "Normal")
+        XCTAssertNotNil(scrubbed["browser"])
+        XCTAssertNil((scrubbed["brave"] as? [String: Any])?["sessions"])
+
+        let scrubbedSecure = try JSONSerialization.jsonObject(with: Data(contentsOf: securePrefsURL)) as! [String: Any]
+        XCTAssertNil(scrubbedSecure["sessions"])
+        XCTAssertEqual((scrubbedSecure["profile"] as? [String: Any])?["exit_type"] as? String, "Normal")
     }
 
     func test_chrome_history_also_deletes_session_restore_files() async throws {

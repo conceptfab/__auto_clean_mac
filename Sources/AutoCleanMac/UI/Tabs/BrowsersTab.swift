@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import AutoCleanMacCore
 
 struct BrowsersTab: View {
@@ -7,9 +8,37 @@ struct BrowsersTab: View {
     // Snapshot of installed browsers, probed once on appear (see `.task` below). Intentionally
     // does not refresh if the user installs/removes a browser while Settings stays open.
     @State private var installed: [BrowserIdentity] = []
+    @State private var fullDiskAccessGranted = true
 
     var body: some View {
         Form {
+            if !fullDiskAccessGranted {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Brak Pełnego dostępu do dysku", systemImage: "lock.shield")
+                            .font(.headline)
+                            .foregroundStyle(.orange)
+                        Text("macOS blokuje czyszczenie historii i ciasteczek Chrome/Brave/Edge, bo ich dane leżą w chronionym katalogu Application Support. Cache działa bez tego uprawnienia, ale historia i ciasteczka wymagają Pełnego dostępu do dysku.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 8) {
+                            Button("Otwórz Pełny dostęp do dysku") {
+                                openFullDiskAccessSettings()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            Button("Sprawdź ponownie") {
+                                fullDiskAccessGranted = FullDiskAccess.isGranted()
+                            }
+                        }
+                        Text("Po dodaniu AutoCleanMac na liście uruchom czyszczenie ponownie. Jeśli aplikacja już jest na liście — usuń ją i dodaj ponownie po tej aktualizacji.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
             if installed.isEmpty {
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
@@ -76,6 +105,12 @@ struct BrowsersTab: View {
             if installed.isEmpty {
                 installed = BrowserIdentity.allCases.filter { $0.isInstalled() }
             }
+            fullDiskAccessGranted = FullDiskAccess.isGranted()
         }
+    }
+
+    private func openFullDiskAccessSettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
+        NSWorkspace.shared.open(url)
     }
 }

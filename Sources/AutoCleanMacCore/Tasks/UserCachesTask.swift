@@ -66,7 +66,7 @@ public struct UserCachesTask: CleanupTask {
             if Self.isProtectedTopLevel(name) {
                 context.logger.log(event: "user_cache_skip", fields: [
                     "path": child.path,
-                    "reason": "protected_top_level",
+                    "reason": Self.isBrowserCacheVendor(name) ? "browser_data_task" : "protected_top_level",
                 ])
                 continue
             }
@@ -104,6 +104,20 @@ public struct UserCachesTask: CleanupTask {
         }
         return protectedPrefixes.contains { name.hasPrefix($0) }
     }
+
+    private static func isBrowserCacheVendor(_ name: String) -> Bool {
+        browserCacheVendorNames.contains(name)
+    }
+
+    private static let browserCacheVendorNames: Set<String> = [
+        "Arc",
+        "BraveSoftware",
+        "Firefox",
+        "Google",
+        "Google Chrome",
+        "Microsoft Edge",
+        "Vivaldi",
+    ]
 
     private static let protectedExactNames: Set<String> = [
         "Arc",

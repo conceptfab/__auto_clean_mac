@@ -30,31 +30,60 @@ public struct BrowserDataTask: CleanupTask {
     }
 
     public func run(context: CleanupContext) async -> TaskResult {
-        guard isEnabled else { return TaskResult(skipped: true, skipReason: "disabled") }
+        guard isEnabled else {
+            logFinish(context: context, result: TaskResult(skipped: true, skipReason: "disabled"))
+            return TaskResult(skipped: true, skipReason: "disabled")
+        }
 
         let roots = browser.profileRoots(homeDirectory: context.homeDirectory)
             .filter { context.fileManager.fileExists(atPath: $0.path) }
         guard !roots.isEmpty else {
-            return TaskResult(skipped: true, skipReason: "no browser profile directories")
+            let result = TaskResult(skipped: true, skipReason: "no browser profile directories")
+            logFinish(context: context, result: result)
+            return result
+        }
+
+        if requiresApplicationSupportAccess, isBlockedByFullDiskAccess(context: context) {
+            let result = TaskResult(
+                bytesFreed: 0,
+                warnings: [Self.fullDiskAccessWarning(for: browser)],
+                skipped: true,
+                skipReason: "full_disk_access_required"
+            )
+            logFinish(context: context, result: result)
+            return result
         }
 
         if isBrowserRunning(browser) {
-            return TaskResult(
+            let result = TaskResult(
                 bytesFreed: 0,
-                warnings: ["\(browser.displayName) jest uruchomiony — pomijam (zamknij przeglądarkę żeby wyczyścić)"],
+                warnings: ["\(browser.displayName) ma otwarte okna — pomijam (zamknij przeglądarkę żeby wyczyścić)"],
                 skipped: true,
                 skipReason: "browser running"
             )
+            logFinish(context: context, result: result)
+            return result
         }
 
         var freed: Int64 = 0
         var itemsDeleted = 0
         var warnings: [String] = []
-        
+
         var profilesToClean: [URL] = []
         if browser.hasProfiles {
             for profilesRoot in roots {
-                profilesToClean.append(contentsOf: listProfileDirs(in: profilesRoot, fileManager: context.fileManager))
+                do {
+                    profilesToClean.append(contentsOf: try listProfileDirs(in: profilesRoot, fileManager: context.fileManager))
+                } catch {
+                    // Na nowym macOS katalogi danych Brave/Chrome są chronione przez TCC.
+                    // Bez uprawnień `contentsOfDirectory` rzuca — NIE wolno tego cicho połknąć,
+                    // bo użytkownik dostałby „0 B” bez wyjaśnienia dlaczego nic się nie wyczyściło.
+                    if Self.isPermissionError(error) {
+                        warnings.append("\(browser.displayName): brak dostępu do danych przeglądarki — nadaj aplikacji Pełny dostęp do dysku (Full Disk Access) w Ustawieniach systemowych › Prywatność i bezpieczeństwo")
+                    } else {
+                        warnings.append("\(profilesRoot.lastPathComponent): \(error)")
+                    }
+                }
             }
         } else {
             // Safari nie ma profili
@@ -62,6 +91,25 @@ public struct BrowserDataTask: CleanupTask {
         }
         
         for profile in profilesToClean {
+            if browser.isChromium && dataType == .history {
+                for preferencesName in ["Preferences", "Secure Preferences"] {
+                    let preferencesURL = profile.appendingPathComponent(preferencesName)
+                    guard context.fileManager.fileExists(atPath: preferencesURL.path) else { continue }
+                    do {
+                        _ = try ChromiumPreferencesScrubber.scrubSessionRestoreData(
+                            at: preferencesURL,
+                            fileManager: context.fileManager
+                        )
+                    } catch {
+                        if Self.isPermissionError(error) {
+                            warnings.append("\(browser.displayName): brak dostępu do \(preferencesName) — nadaj aplikacji Pełny dostęp do dysku (Full Disk Access) w Ustawieniach systemowych › Prywatność i bezpieczeństwo")
+                        } else {
+                            warnings.append("\(preferencesName): \(error)")
+                        }
+                    }
+                }
+            }
+
             let paths = itemsToDelete(in: profile)
             for url in paths where context.fileManager.fileExists(atPath: url.path) {
                 do {
@@ -73,16 +121,76 @@ public struct BrowserDataTask: CleanupTask {
                 }
             }
         }
-        return TaskResult(bytesFreed: freed, itemsDeleted: itemsDeleted, warnings: warnings)
+        let result = TaskResult(bytesFreed: freed, itemsDeleted: itemsDeleted, warnings: warnings)
+        logFinish(context: context, result: result)
+        return result
     }
 
-    private func listProfileDirs(in root: URL, fileManager: FileManager) -> [URL] {
-        guard let children = try? fileManager.contentsOfDirectory(
+    private var requiresApplicationSupportAccess: Bool {
+        switch dataType {
+        case .cache:
+            return false
+        case .cookies, .history:
+            return true
+        }
+    }
+
+    private func isBlockedByFullDiskAccess(context: CleanupContext) -> Bool {
+        let protectedRoots = browser.applicationSupportProfileRoots(homeDirectory: context.homeDirectory)
+            .filter { context.fileManager.fileExists(atPath: $0.path) }
+        guard !protectedRoots.isEmpty else { return false }
+        return !protectedRoots.contains { Self.isProfileRootReadable($0, fileManager: context.fileManager) }
+    }
+
+    private static func isProfileRootReadable(_ root: URL, fileManager: FileManager) -> Bool {
+        do {
+            _ = try fileManager.contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )
+            return true
+        } catch {
+            return !isPermissionError(error)
+        }
+    }
+
+    private static func fullDiskAccessWarning(for browser: BrowserIdentity) -> String {
+        "\(browser.displayName): wymaga Pełnego dostępu do dysku (Full Disk Access) — macOS blokuje ~/Library/Application Support. Dodaj AutoCleanMac w Ustawieniach systemowych › Prywatność i bezpieczeństwo › Pełny dostęp do dysku."
+    }
+
+    private func logFinish(context: CleanupContext, result: TaskResult) {
+        context.logger.log(event: result.skipped ? "browser_data_skip" : "browser_data_done", fields: [
+            "browser": browser.rawValue,
+            "type": dataType.rawValue,
+            "freed": "\(result.bytesFreed)",
+            "items": "\(result.itemsDeleted)",
+            "warnings": "\(result.warnings.count)",
+            "skip_reason": result.skipReason ?? "",
+        ])
+    }
+
+    private func listProfileDirs(in root: URL, fileManager: FileManager) throws -> [URL] {
+        let children = try fileManager.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
-        ) else { return [] }
+        )
         return children.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+    }
+
+    /// Czy błąd to odmowa dostępu (POSIX EACCES/EPERM lub Cocoa „no permission”).
+    /// macOS opakowuje błąd POSIX w `NSUnderlyingErrorKey`, więc sprawdzamy też zagnieżdżenie.
+    private static func isPermissionError(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError { return true }
+        if ns.domain == NSPOSIXErrorDomain && (ns.code == Int(EACCES) || ns.code == Int(EPERM)) { return true }
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError,
+           underlying.domain == NSPOSIXErrorDomain,
+           underlying.code == Int(EACCES) || underlying.code == Int(EPERM) {
+            return true
+        }
+        return false
     }
 
     /// Lista konkretnych plików/katalogów do usunięcia w obrębie jednego profilu.
@@ -148,6 +256,9 @@ public struct BrowserDataTask: CleanupTask {
                 profile.appendingPathComponent("Visited Links"),
                 profile.appendingPathComponent("Top Sites"),
                 profile.appendingPathComponent("Top Sites-journal"),
+                // Predykcje adresów z historii (omnibox)
+                profile.appendingPathComponent("Network Action Predictor"),
+                profile.appendingPathComponent("Network Action Predictor-journal"),
                 // Session restore — bez tego przeglądarka wraca do poprzednich tabów
                 profile.appendingPathComponent("Sessions"),
                 profile.appendingPathComponent("Session Storage"),
