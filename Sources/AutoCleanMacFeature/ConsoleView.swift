@@ -1,7 +1,9 @@
 import SwiftUI
 import AutoCleanMacCore
 
-final class ConsoleViewModel: ObservableObject {
+public final class ConsoleViewModel: ObservableObject {
+    public init() {}
+
     struct Line: Identifiable {
         let id = UUID()
         let prefix: String // "✓", "⚠", "✗", "•"
@@ -58,10 +60,14 @@ final class ConsoleViewModel: ObservableObject {
     }
 }
 
-struct ConsoleView: View {
+public struct ConsoleView: View {
     @ObservedObject var model: ConsoleViewModel
 
-    var body: some View {
+    public init(model: ConsoleViewModel) {
+        self.model = model
+    }
+
+    public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {

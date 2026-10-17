@@ -2,24 +2,35 @@ import AppKit
 import SwiftUI
 import AutoCleanMacCore
 
-struct UninstallFailure: Sendable {
-    let appName: String
-    let reason: String
+public struct UninstallFailure: Sendable {
+    public let appName: String
+    public let reason: String
+
+    public init(appName: String, reason: String) {
+        self.appName = appName
+        self.reason = reason
+    }
 }
 
-struct UninstallOutcome: Sendable {
-    var freedBytes: Int64
-    var succeeded: Int
-    var failures: [UninstallFailure]
+public struct UninstallOutcome: Sendable {
+    public var freedBytes: Int64
+    public var succeeded: Int
+    public var failures: [UninstallFailure]
+
+    public init(freedBytes: Int64, succeeded: Int, failures: [UninstallFailure]) {
+        self.freedBytes = freedBytes
+        self.succeeded = succeeded
+        self.failures = failures
+    }
 }
 
 /// Observable model trzymający EDYTOWALNE preferencje.
-final class SettingsModel: ObservableObject {
+public final class SettingsModel: ObservableObject {
     @Published var retentionDays: Int
     @Published var deleteMode: DeleteMode
     @Published var reminder: Config.Reminder
     @Published var launchAtLogin: Bool
-    @Published var statistics: AppStatistics
+    @Published public var statistics: AppStatistics
     @Published var tasks: Config.Tasks
     @Published var browsers: [BrowserIdentity: BrowserPreferences]
     @Published var excludedPathsText: String
@@ -41,7 +52,7 @@ final class SettingsModel: ObservableObject {
     let homeDirectory: URL
     private let baseConfig: Config
 
-    init(
+    public init(
         initial: Config,
         statistics: AppStatistics,
         launchAtLogin: Bool,
@@ -144,7 +155,7 @@ final class SettingsModel: ObservableObject {
         "\(enabledTaskCount) zadań systemowych aktywnych"
     }
 
-    func currentConfig() -> Config {
+    public func currentConfig() -> Config {
         var updated = baseConfig
         updated.retentionDays = retentionDays
         updated.deleteMode = deleteMode
@@ -168,7 +179,7 @@ final class SettingsModel: ObservableObject {
     func preview() { onPreview(currentConfig()) }
 }
 
-struct SettingsView: View {
+public struct SettingsView: View {
     private enum SettingsSection: String, CaseIterable, Identifiable {
         case scanner
         case general
@@ -220,7 +231,11 @@ struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @State private var selection: SettingsSection = .scanner
 
-    var body: some View {
+    public init(model: SettingsModel) {
+        self.model = model
+    }
+
+    public var body: some View {
         VStack(spacing: 0) {
             HSplitView {
                 sidebar

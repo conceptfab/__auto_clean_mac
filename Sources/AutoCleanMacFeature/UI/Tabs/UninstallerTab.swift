@@ -33,20 +33,20 @@ final class UninstallerViewModel: ObservableObject {
     }
 }
 
-struct UninstallerTab: View {
+public struct UninstallerTab: View {
     @StateObject private var viewModel: UninstallerViewModel
     @ObservedObject var settingsModel: SettingsModel
     @State private var showingAlert = false
     @State private var alertTitle = ""
     @State private var alertMessage = ""
     
-    init(settingsModel: SettingsModel) {
+    public init(settingsModel: SettingsModel) {
         self.settingsModel = settingsModel
         _viewModel = StateObject(wrappedValue: UninstallerViewModel(homeDirectory: settingsModel.homeDirectory))
     }
     
     
-    var body: some View {
+    public var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {

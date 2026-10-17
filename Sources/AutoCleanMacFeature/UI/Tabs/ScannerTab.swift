@@ -46,11 +46,15 @@ final class ScannerViewModel: ObservableObject {
     }
 }
 
-struct ScannerTab: View {
+public struct ScannerTab: View {
     @ObservedObject var settingsModel: SettingsModel
     @StateObject private var viewModel = ScannerViewModel()
 
-    var body: some View {
+    public init(settingsModel: SettingsModel) {
+        self.settingsModel = settingsModel
+    }
+
+    public var body: some View {
         VStack(spacing: 0) {
             // Header
             VStack(spacing: 12) {

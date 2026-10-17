@@ -53,6 +53,12 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
         ])
     }
 
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        logger.log(event: "reminder_stopped")
+    }
+
     private func fire() {
         switch currentReminder.mode {
         case .off:

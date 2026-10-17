@@ -1,10 +1,14 @@
 import SwiftUI
 import AutoCleanMacCore
 
-struct CleanupTab: View {
+public struct CleanupTab: View {
     @ObservedObject var model: SettingsModel
 
-    var body: some View {
+    public init(model: SettingsModel) {
+        self.model = model
+    }
+
+    public var body: some View {
         Form {
             Section {
                 Toggle(isOn: $model.tasks.userCaches) {

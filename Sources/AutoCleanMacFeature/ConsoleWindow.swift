@@ -1,11 +1,15 @@
 import AppKit
 import SwiftUI
 
-final class ConsoleWindow: NSObject {
+public final class ConsoleWindow: NSObject {
     private var panel: NSPanel?
-    let model = ConsoleViewModel()
+    public let model = ConsoleViewModel()
 
-    func showCentered(fadeInMs: Int) {
+    public override init() {
+        super.init()
+    }
+
+    public func showCentered(fadeInMs: Int) {
         let view = ConsoleView(model: model)
         let hosting = NSHostingView(rootView: view)
         let size = NSSize(width: 600, height: 500)
@@ -48,7 +52,7 @@ final class ConsoleWindow: NSObject {
         self.panel = panel
     }
 
-    func fadeOutAndClose(holdMs: Int, fadeOutMs: Int, completion: @escaping () -> Void) {
+    public func fadeOutAndClose(holdMs: Int, fadeOutMs: Int, completion: @escaping () -> Void) {
         let deadline = DispatchTime.now() + .milliseconds(holdMs)
         DispatchQueue.main.asyncAfter(deadline: deadline) { [weak self] in
             guard let panel = self?.panel else { completion(); return }

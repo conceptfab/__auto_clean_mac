@@ -1,6 +1,8 @@
 import SwiftUI
 
-struct AboutTab: View {
+public struct AboutTab: View {
+    public init() {}
+
     private var versionString: String {
         let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
@@ -16,7 +18,7 @@ struct AboutTab: View {
         }
     }
 
-    var body: some View {
+    public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 HStack(alignment: .center, spacing: 18) {

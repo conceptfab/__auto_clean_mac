@@ -1,8 +1,12 @@
 import SwiftUI
 import AutoCleanMacCore
 
-struct StatisticsTab: View {
+public struct StatisticsTab: View {
     @ObservedObject var model: SettingsModel
+
+    public init(model: SettingsModel) {
+        self.model = model
+    }
 
     private var totalBytesString: String {
         ByteFormatting.string(model.statistics.totalBytesFreed)
@@ -15,7 +19,7 @@ struct StatisticsTab: View {
         return date.formatted(date: .abbreviated, time: .shortened)
     }
 
-    var body: some View {
+    public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 PreferencesGroup("Od instalacji") {

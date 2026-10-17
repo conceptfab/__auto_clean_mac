@@ -1,10 +1,14 @@
 import SwiftUI
 import AutoCleanMacCore
 
-struct LogsTab: View {
+public struct LogsTab: View {
     @ObservedObject var model: SettingsModel
 
-    var body: some View {
+    public init(model: SettingsModel) {
+        self.model = model
+    }
+
+    public var body: some View {
         Form {
             Section {
                 HStack(spacing: 10) {

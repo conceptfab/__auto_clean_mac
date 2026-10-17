@@ -1,10 +1,14 @@
 import SwiftUI
 import AutoCleanMacCore
 
-struct OrphanCleanerTab: View {
+public struct OrphanCleanerTab: View {
     @ObservedObject var settingsModel: SettingsModel
 
-    var body: some View {
+    public init(settingsModel: SettingsModel) {
+        self.settingsModel = settingsModel
+    }
+
+    public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Osierocone preferencje")

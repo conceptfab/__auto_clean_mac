@@ -2,15 +2,19 @@ import SwiftUI
 import AppKit
 import AutoCleanMacCore
 
-struct BrowsersTab: View {
+public struct BrowsersTab: View {
     @ObservedObject var model: SettingsModel
+
+    public init(model: SettingsModel) {
+        self.model = model
+    }
 
     // Snapshot of installed browsers, probed once on appear (see `.task` below). Intentionally
     // does not refresh if the user installs/removes a browser while Settings stays open.
     @State private var installed: [BrowserIdentity] = []
     @State private var fullDiskAccessGranted = true
 
-    var body: some View {
+    public var body: some View {
         Form {
             if !fullDiskAccessGranted {
                 Section {

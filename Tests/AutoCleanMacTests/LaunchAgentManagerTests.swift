@@ -1,5 +1,5 @@
 import XCTest
-@testable import AutoCleanMac
+@testable import AutoCleanMacFeature
 
 final class LaunchAgentManagerTests: XCTestCase {
     func test_launchAgentPlist_contains_expected_program_arguments_and_logs() throws {
