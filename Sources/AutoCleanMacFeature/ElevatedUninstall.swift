@@ -31,12 +31,17 @@ enum ElevatedUninstall {
     /// Trwale usuwa element z autoryzacją administratora. macOS pokazuje standardowe okno hasła.
     /// Autoryzacja jest cache'owana ~5 minut, więc seria deinstalacji = jeden prompt.
     static func removeWithAdmin(_ url: URL) throws {
-        let escaped = escapeForAppleScript(url.path)
-        let source = "do shell script \"rm -rf \" & quoted form of \"\(escaped)\" with administrator privileges"
-        try runScript(source)
+        try runScript(adminRemoveScript(for: url))
     }
 
-    private static func escapeForAppleScript(_ s: String) -> String {
+    /// AppleScript usuwający element z autoryzacją administratora: macOS pokazuje własne okno
+    /// hasła (nigdy `sudo` w tle).
+    nonisolated static func adminRemoveScript(for url: URL) -> String {
+        let escaped = escapeForAppleScript(url.path)
+        return "do shell script \"rm -rf \" & quoted form of \"\(escaped)\" with administrator privileges"
+    }
+
+    private nonisolated static func escapeForAppleScript(_ s: String) -> String {
         s.replacingOccurrences(of: "\\", with: "\\\\")
          .replacingOccurrences(of: "\"", with: "\\\"")
     }

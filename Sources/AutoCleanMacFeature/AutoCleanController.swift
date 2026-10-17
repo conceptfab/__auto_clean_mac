@@ -10,6 +10,41 @@ import AutoCleanMacCore
 public final class AutoCleanController {
     public enum Phase: Equatable { case idle, running(progress: Double?), failed(String) }
 
+    /// Identyfikatory okien (`NSWindow.identifier`): preferencje i konsola cleanupu.
+    public nonisolated static let settingsWindowID = "autoclean.main"
+    public nonisolated static let consoleWindowID = "autoclean.console"
+
+    /// Co steruje przełącznikiem autostartu w zakładce Ogólne. Domyślnie LaunchAgent
+    /// `com.micz.autocleanmac` (samodzielna aplikacja); hub podstawia własną opcję.
+    public struct LaunchAtLoginOption {
+        public var title: String
+        public var footer: String
+        public var isEnabled: @MainActor () -> Bool
+        public var setEnabled: @MainActor (Bool) throws -> Void
+
+        public init(
+            title: String,
+            footer: String,
+            isEnabled: @escaping @MainActor () -> Bool,
+            setEnabled: @escaping @MainActor (Bool) throws -> Void
+        ) {
+            self.title = title
+            self.footer = footer
+            self.isEnabled = isEnabled
+            self.setEnabled = setEnabled
+        }
+
+        /// Dotychczasowe zachowanie: LaunchAgent z `--launch-agent`.
+        public static var launchAgent: LaunchAtLoginOption {
+            LaunchAtLoginOption(
+                title: "Uruchamiaj przy logowaniu",
+                footer: "To podstawowa opcja dla komputerów, które rzadko są restartowane. Steruje LaunchAgentem, więc AutoCleanMac może uruchamiać się po zalogowaniu i działać w tle.",
+                isEnabled: { LaunchAgentManager.isEnabled() },
+                setEnabled: { try LaunchAgentManager.setEnabled($0) }
+            )
+        }
+    }
+
     enum RunPresentation {
         case cleanup
         case preview
@@ -30,6 +65,10 @@ public final class AutoCleanController {
     public var onSettingsWindowClosed: (() -> Void)?
     /// Gdy `true`, cleanup zwalniający miejsce wysyła powiadomienie systemowe (uruchomienie w tle).
     public var postsBackgroundNotification = false
+    /// Tytuł okna preferencji.
+    public var settingsWindowTitle = "AutoCleanMac — Preferencje"
+    /// `false` ukrywa w zakładce Ogólne przełącznik skrótu ⌘⇧C (hub go nie przenosi).
+    public var showsGlobalShortcutOption = true
 
     /// `false`, gdy nie udało się utworzyć katalogu logów — cleanup nie wystartuje.
     public var isLoggerAvailable: Bool { logger != nil }
@@ -39,6 +78,7 @@ public final class AutoCleanController {
     private let statisticsURL: URL
     private let logsDir: URL
     private let logger: Logger?
+    private let launchAtLogin: LaunchAtLoginOption
 
     private(set) var launchAtLoginEnabled: Bool
     private var isRunning = false
@@ -48,8 +88,12 @@ public final class AutoCleanController {
     private var settingsModel: SettingsModel?
     private var settingsCloseObserver: NSObjectProtocol?
 
-    public init(home: URL = FileManager.default.homeDirectoryForCurrentUser) {
+    public init(
+        home: URL = FileManager.default.homeDirectoryForCurrentUser,
+        launchAtLogin: LaunchAtLoginOption = .launchAgent
+    ) {
         self.home = home
+        self.launchAtLogin = launchAtLogin
         configURL = home.appendingPathComponent(".config/autoclean-mac/config.json")
         statisticsURL = home.appendingPathComponent(".config/autoclean-mac/statistics.json")
         logsDir = home.appendingPathComponent("Library/Logs/AutoCleanMac")
@@ -67,7 +111,7 @@ public final class AutoCleanController {
             logger?.log(event: "config_warn", fields: ["msg": warn])
         }
         statistics = AppStatisticsStore.loadOrDefault(from: statisticsURL, logger: logger)
-        launchAtLoginEnabled = LaunchAgentManager.isEnabled()
+        launchAtLoginEnabled = launchAtLogin.isEnabled()
     }
 
     /// Zapis zdarzenia do logu aplikacji (dla powłoki, np. AppDelegate).
@@ -327,18 +371,24 @@ public final class AutoCleanController {
 
     // MARK: - Settings window
 
-    public func openSettingsWindow() {
+    /// Otwiera okno preferencji (albo przywołuje otwarte), opcjonalnie na wskazanej zakładce.
+    public func openSettingsWindow(section: SettingsSection? = nil) {
         if let win = settingsWindow {
+            if let section { settingsModel?.selectedSection = section }
             win.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
         let model = makeSettingsModel()
+        if let section { model.selectedSection = section }
         let host = NSHostingController(rootView: SettingsView(model: model))
         let win = NSWindow(contentViewController: host)
-        win.title = "AutoCleanMac — Preferencje"
+        win.identifier = NSUserInterfaceItemIdentifier(Self.settingsWindowID)
+        win.title = settingsWindowTitle
         win.styleMask = [.titled, .closable, .miniaturizable]
-        win.isReleasedWhenClosed = true
+        // The controller owns the window (`settingsWindow`, released in `releaseSettingsWindow`);
+        // AppKit's own release on close on top of that is a double release under ARC.
+        win.isReleasedWhenClosed = false
         win.animationBehavior = .none
         win.center()
         settingsModel = model
@@ -356,8 +406,27 @@ public final class AutoCleanController {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// Okno preferencji jest otwarte.
+    public var isSettingsWindowOpen: Bool { settingsWindow != nil }
+
+    /// Zakładka otwartego okna preferencji (`nil`, gdy okno jest zamknięte).
+    public var settingsSection: SettingsSection? { settingsModel?.selectedSection }
+
+    public func closeSettingsWindow() {
+        settingsWindow?.close()
+    }
+
     /// Model ustawień podpięty pod ten kontroler (zapis, cleanup, deinstalator, sieroty).
     public func makeSettingsModel() -> SettingsModel {
+        launchAtLoginEnabled = launchAtLogin.isEnabled()
+        let model = makeBareSettingsModel()
+        model.launchAtLoginTitle = launchAtLogin.title
+        model.launchAtLoginFooter = launchAtLogin.footer
+        model.showsGlobalShortcutOption = showsGlobalShortcutOption
+        return model
+    }
+
+    private func makeBareSettingsModel() -> SettingsModel {
         let home = self.home
         return SettingsModel(
             initial: config,
@@ -502,7 +571,7 @@ public final class AutoCleanController {
         do {
             try ConfigWriter.write(updated, to: configURL)
             if launchAtLogin != launchAtLoginEnabled {
-                try LaunchAgentManager.setEnabled(launchAtLogin)
+                try self.launchAtLogin.setEnabled(launchAtLogin)
                 launchAtLoginEnabled = launchAtLogin
                 logger?.log(event: "launch_at_login_changed", fields: [
                     "enabled": launchAtLogin ? "true" : "false",

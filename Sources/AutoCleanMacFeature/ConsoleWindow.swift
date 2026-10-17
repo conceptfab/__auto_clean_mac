@@ -19,6 +19,7 @@ public final class ConsoleWindow: NSObject {
             backing: .buffered,
             defer: false
         )
+        panel.identifier = NSUserInterfaceItemIdentifier(AutoCleanController.consoleWindowID)
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]

@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 import AutoCleanMacCore
 @testable import AutoCleanMacFeature
@@ -143,5 +144,64 @@ final class AutoCleanControllerTests: XCTestCase {
         XCTAssertEqual(model.currentConfig(), controller.config)
         XCTAssertEqual(model.statistics, controller.statistics)
         XCTAssertEqual(model.homeDirectory, home)
+    }
+
+    func test_settingsSection_hasElevenTabsAndParsesKeys() {
+        XCTAssertEqual(SettingsSection.allCases.count, 11)
+        XCTAssertEqual(SettingsSection(key: "uninstaller"), .uninstaller)
+        XCTAssertEqual(SettingsSection(key: "Reminders"), .reminders)
+        XCTAssertNil(SettingsSection(key: "nope"))
+    }
+
+    func test_openSettingsWindow_onSection_selectsThatTab() throws {
+        _ = NSApplication.shared   // `swift test` nie tworzy NSApp
+        try ConfigWriter.write(inertConfig(), to: configURL)
+        let controller = AutoCleanController(home: home, launchAtLogin: fakeLaunchAtLogin())
+        defer { controller.closeSettingsWindow() }
+
+        controller.openSettingsWindow(section: .uninstaller)
+        XCTAssertTrue(controller.isSettingsWindowOpen)
+        XCTAssertEqual(controller.settingsSection, .uninstaller)
+        let window = NSApp.windows.first { $0.identifier?.rawValue == AutoCleanController.settingsWindowID }
+        XCTAssertNotNil(window)
+
+        // Ponowne otwarcie przełącza zakładkę w już otwartym oknie.
+        controller.openSettingsWindow(section: .reminders)
+        XCTAssertEqual(controller.settingsSection, .reminders)
+        controller.openSettingsWindow()
+        XCTAssertEqual(controller.settingsSection, .reminders)
+    }
+
+    func test_launchAtLoginOption_isInjectedIntoModelAndPersist() throws {
+        var stored = false
+        var calls: [Bool] = []
+        let option = AutoCleanController.LaunchAtLoginOption(
+            title: "Sprzątaj po zalogowaniu",
+            footer: "hub",
+            isEnabled: { stored },
+            setEnabled: { stored = $0; calls.append($0) }
+        )
+        let controller = AutoCleanController(home: home, launchAtLogin: option)
+        controller.showsGlobalShortcutOption = false
+
+        let model = controller.makeSettingsModel()
+        XCTAssertEqual(model.launchAtLoginTitle, "Sprzątaj po zalogowaniu")
+        XCTAssertFalse(model.launchAtLogin)
+        XCTAssertFalse(model.showsGlobalShortcutOption)
+
+        XCTAssertTrue(controller.persistConfig(inertConfig(), launchAtLogin: true))
+        XCTAssertEqual(calls, [true])
+        XCTAssertTrue(controller.makeSettingsModel().launchAtLogin)
+    }
+
+    private func fakeLaunchAtLogin() -> AutoCleanController.LaunchAtLoginOption {
+        AutoCleanController.LaunchAtLoginOption(title: "t", footer: "f", isEnabled: { false }, setEnabled: { _ in })
+    }
+
+    func test_adminRemoveScript_usesSystemAdminPromptNotSudo() {
+        let script = ElevatedUninstall.adminRemoveScript(for: URL(fileURLWithPath: "/Applications/Some \"App\".app"))
+        XCTAssertTrue(script.hasSuffix("with administrator privileges"))
+        XCTAssertFalse(script.contains("sudo"))
+        XCTAssertTrue(script.contains("quoted form of \"/Applications/Some \\\"App\\\".app\""))
     }
 }

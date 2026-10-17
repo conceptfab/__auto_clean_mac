@@ -11,23 +11,25 @@ public struct GeneralTab: View {
     public var body: some View {
         Form {
             Section {
-                Toggle("Uruchamiaj przy logowaniu", isOn: $model.launchAtLogin)
+                Toggle(model.launchAtLoginTitle, isOn: $model.launchAtLogin)
             } header: {
                 Text("Autostart")
             } footer: {
-                Text("To podstawowa opcja dla komputerów, które rzadko są restartowane. Steruje LaunchAgentem, więc AutoCleanMac może uruchamiać się po zalogowaniu i działać w tle.")
+                Text(model.launchAtLoginFooter)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
-            Section {
-                Toggle("Włącz globalny skrót (Cmd+Shift+C)", isOn: $model.globalShortcutEnabled)
-            } header: {
-                Text("Skróty Klawiszowe")
-            } footer: {
-                Text("Po włączeniu naciśnij Cmd+Shift+C z dowolnego miejsca w systemie, aby wywołać okno Skanera.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            if model.showsGlobalShortcutOption {
+                Section {
+                    Toggle("Włącz globalny skrót (Cmd+Shift+C)", isOn: $model.globalShortcutEnabled)
+                } header: {
+                    Text("Skróty Klawiszowe")
+                } footer: {
+                    Text("Po włączeniu naciśnij Cmd+Shift+C z dowolnego miejsca w systemie, aby wywołać okno Skanera.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section {

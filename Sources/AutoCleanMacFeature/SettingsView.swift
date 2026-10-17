@@ -36,6 +36,13 @@ public final class SettingsModel: ObservableObject {
     @Published var excludedPathsText: String
     @Published var whitelistedCacheAppsText: String
     @Published var globalShortcutEnabled: Bool
+    /// Wybrana zakładka okna preferencji (`nil` tylko chwilowo, gdy lista zgubi zaznaczenie).
+    @Published public var selectedSection: SettingsSection? = .scanner
+    /// Opis przełącznika autostartu w zakładce Ogólne (hub podmienia go na „Sprzątaj po zalogowaniu”).
+    public var launchAtLoginTitle = "Uruchamiaj przy logowaniu"
+    public var launchAtLoginFooter = "To podstawowa opcja dla komputerów, które rzadko są restartowane. Steruje LaunchAgentem, więc AutoCleanMac może uruchamiać się po zalogowaniu i działać w tle."
+    /// `false` w hubie: skrót ⌘⇧C nie jest tam przenoszony (SPEC huba §4.6).
+    public var showsGlobalShortcutOption = true
 
     @Published var orphans: [OrphanGroup] = []
     @Published var selectedOrphans: Set<String> = []
@@ -179,57 +186,62 @@ public final class SettingsModel: ObservableObject {
     func preview() { onPreview(currentConfig()) }
 }
 
-public struct SettingsView: View {
-    private enum SettingsSection: String, CaseIterable, Identifiable {
-        case scanner
-        case general
-        case cleanup
-        case browsers
-        case uninstaller
-        case orphans
-        case reminders
-        case advanced
-        case statistics
-        case logs
-        case about
+/// Zakładki okna preferencji (11 sekcji).
+public enum SettingsSection: String, CaseIterable, Identifiable {
+    case scanner
+    case general
+    case cleanup
+    case browsers
+    case uninstaller
+    case orphans
+    case reminders
+    case advanced
+    case statistics
+    case logs
+    case about
 
-        var id: String { rawValue }
+    public var id: String { rawValue }
 
-        var title: String {
-            switch self {
-            case .scanner: return "Skaner"
-            case .general: return "Ogólne"
-            case .statistics: return "Statystyki"
-            case .about: return "O programie"
-            case .cleanup: return "Czyszczenie"
-            case .browsers: return "Przeglądarki"
-            case .uninstaller: return "Deinstalator"
-            case .orphans: return "Osierocone preferencje"
-            case .reminders: return "Przypominacz"
-            case .advanced: return "Zaawansowane"
-            case .logs: return "Logi"
-            }
-        }
+    /// Sekcja z klucza (np. `uninstaller` z `cfab-control://autoclean/open?tab=uninstaller`).
+    public init?(key: String) {
+        self.init(rawValue: key.lowercased())
+    }
 
-        var symbol: String {
-            switch self {
-            case .scanner: return "magnifyingglass"
-            case .general: return "gearshape"
-            case .statistics: return "chart.bar"
-            case .about: return "info.circle"
-            case .cleanup: return "trash"
-            case .browsers: return "globe"
-            case .uninstaller: return "app.dashed"
-            case .orphans: return "questionmark.folder"
-            case .reminders: return "bell"
-            case .advanced: return "slider.horizontal.3"
-            case .logs: return "doc.text"
-            }
+    public var title: String {
+        switch self {
+        case .scanner: return "Skaner"
+        case .general: return "Ogólne"
+        case .statistics: return "Statystyki"
+        case .about: return "O programie"
+        case .cleanup: return "Czyszczenie"
+        case .browsers: return "Przeglądarki"
+        case .uninstaller: return "Deinstalator"
+        case .orphans: return "Osierocone preferencje"
+        case .reminders: return "Przypominacz"
+        case .advanced: return "Zaawansowane"
+        case .logs: return "Logi"
         }
     }
 
+    public var symbol: String {
+        switch self {
+        case .scanner: return "magnifyingglass"
+        case .general: return "gearshape"
+        case .statistics: return "chart.bar"
+        case .about: return "info.circle"
+        case .cleanup: return "trash"
+        case .browsers: return "globe"
+        case .uninstaller: return "app.dashed"
+        case .orphans: return "questionmark.folder"
+        case .reminders: return "bell"
+        case .advanced: return "slider.horizontal.3"
+        case .logs: return "doc.text"
+        }
+    }
+}
+
+public struct SettingsView: View {
     @ObservedObject var model: SettingsModel
-    @State private var selection: SettingsSection = .scanner
 
     public init(model: SettingsModel) {
         self.model = model
@@ -272,7 +284,7 @@ public struct SettingsView: View {
             .padding(.horizontal, 12)
             .padding(.top, 12)
 
-            List(SettingsSection.allCases, selection: $selection) { section in
+            List(SettingsSection.allCases, selection: $model.selectedSection) { section in
                 Label(section.title, systemImage: section.symbol)
                     .tag(section)
             }
@@ -284,7 +296,7 @@ public struct SettingsView: View {
 
     @ViewBuilder
     private var detailContent: some View {
-        switch selection {
+        switch model.selectedSection ?? .scanner {
         case .scanner:
             ScannerTab(settingsModel: model)
         case .general:
