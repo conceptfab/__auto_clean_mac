@@ -156,7 +156,11 @@ public struct BrowserDataTask: CleanupTask {
     }
 
     private static func fullDiskAccessWarning(for browser: BrowserIdentity) -> String {
-        "\(browser.displayName): wymaga Pełnego dostępu do dysku (Full Disk Access) — macOS blokuje ~/Library/Application Support. Dodaj AutoCleanMac w Ustawieniach systemowych › Prywatność i bezpieczeństwo › Pełny dostęp do dysku."
+        // Uprawnienie TCC dostaje aplikacja-host (samodzielny AutoCleanMac albo CFAB Control), nie moduł.
+        let hostName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+            ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
+            ?? "AutoCleanMac"
+        return "\(browser.displayName): wymaga Pełnego dostępu do dysku (Full Disk Access) — macOS blokuje ~/Library/Application Support. Dodaj \(hostName) w Ustawieniach systemowych › Prywatność i bezpieczeństwo › Pełny dostęp do dysku."
     }
 
     private func logFinish(context: CleanupContext, result: TaskResult) {
