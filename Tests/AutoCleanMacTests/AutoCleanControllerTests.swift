@@ -49,6 +49,36 @@ final class AutoCleanControllerTests: XCTestCase {
         XCTAssertTrue(isDir.boolValue)
     }
 
+    func test_embeddedSettingsKeepDraftAcrossPagesAndToolWindowWithoutSaving() throws {
+        try ConfigWriter.write(inertConfig(), to: configURL)
+        let controller = AutoCleanController(home: home)
+        let draft = controller.makeSharedSettingsModel()
+        draft.retentionDays = 17
+        draft.reminder.intervalHours = 6
+
+        let nextPage = controller.makeSharedSettingsModel()
+        let toolWindow = controller.makeSettingsModel()
+        XCTAssertTrue(nextPage === draft)
+        XCTAssertTrue(toolWindow === draft)
+        XCTAssertEqual(nextPage.currentConfig().retentionDays, 17)
+        XCTAssertEqual(toolWindow.currentConfig().reminder.intervalHours, 6)
+        XCTAssertEqual(controller.config.retentionDays, 3)
+        XCTAssertEqual(Config.loadOrDefault(from: configURL, warn: { _ in }).retentionDays, 3)
+    }
+
+    func test_embeddingAnOpenToolWindowPreservesItsUnsavedDraft() {
+        let controller = AutoCleanController(home: home)
+        controller.openSettingsWindow(section: .general)
+        defer { controller.closeSettingsWindow() }
+        let draft = controller.makeSharedSettingsModel()
+        draft.retentionDays = 19
+        controller.closeSettingsWindow()
+
+        XCTAssertTrue(controller.makeSettingsModel() === draft)
+        XCTAssertEqual(controller.makeSharedSettingsModel().currentConfig().retentionDays, 19)
+        XCTAssertNotEqual(controller.config.retentionDays, 19)
+    }
+
     func test_init_loadsConfigAndStatisticsFromHome() throws {
         try ConfigWriter.write(inertConfig(), to: configURL)
         let stats = AppStatistics(

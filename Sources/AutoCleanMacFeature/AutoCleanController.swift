@@ -86,6 +86,7 @@ public final class AutoCleanController {
     private var reminderScheduler: ReminderScheduler?
     private var settingsWindow: NSWindow?
     private var settingsModel: SettingsModel?
+    private var embeddedSettingsModel: SettingsModel?
     private var settingsCloseObserver: NSObjectProtocol?
 
     public init(
@@ -186,6 +187,7 @@ public final class AutoCleanController {
             let updatedStatistics = statistics.recording(summary)
             statistics = updatedStatistics
             settingsModel?.statistics = updatedStatistics
+            embeddedSettingsModel?.statistics = updatedStatistics
             model.lifetimeRuns = updatedStatistics.totalRuns
             model.lifetimeItemsDeleted = updatedStatistics.totalItemsDeleted
             model.lifetimeBytesFreed = updatedStatistics.totalBytesFreed
@@ -418,11 +420,20 @@ public final class AutoCleanController {
 
     /// Model ustawień podpięty pod ten kontroler (zapis, cleanup, deinstalator, sieroty).
     public func makeSettingsModel() -> SettingsModel {
+        if let embeddedSettingsModel { return embeddedSettingsModel }
         launchAtLoginEnabled = launchAtLogin.isEnabled()
         let model = makeBareSettingsModel()
         model.launchAtLoginTitle = launchAtLogin.title
         model.launchAtLoginFooter = launchAtLogin.footer
         model.showsGlobalShortcutOption = showsGlobalShortcutOption
+        return model
+    }
+
+    /// The hub's pages and the standalone tool window share a draft while embedded.
+    public func makeSharedSettingsModel() -> SettingsModel {
+        if let embeddedSettingsModel { return embeddedSettingsModel }
+        let model = settingsModel ?? makeSettingsModel()
+        embeddedSettingsModel = model
         return model
     }
 

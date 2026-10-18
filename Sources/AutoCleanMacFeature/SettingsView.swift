@@ -187,7 +187,7 @@ public final class SettingsModel: ObservableObject {
 }
 
 /// Zakładki okna preferencji (11 sekcji).
-public enum SettingsSection: String, CaseIterable, Identifiable {
+public enum SettingsSection: String, CaseIterable, Identifiable, Sendable {
     case scanner
     case general
     case cleanup
@@ -242,34 +242,59 @@ public enum SettingsSection: String, CaseIterable, Identifiable {
 
 public struct SettingsView: View {
     @ObservedObject var model: SettingsModel
+    private let embeddedSection: SettingsSection?
 
-    public init(model: SettingsModel) {
+    public init(model: SettingsModel, section: SettingsSection? = nil) {
         self.model = model
+        embeddedSection = section
     }
 
     public var body: some View {
+        if let embeddedSection {
+            editor(section: embeddedSection)
+        } else {
+            standalone
+        }
+    }
+
+    private func editor(section: SettingsSection) -> some View {
+        detailContent(section: section)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaInset(edge: .bottom, spacing: 0) { saveBar }
+    }
+
+    private var standalone: some View {
         VStack(spacing: 0) {
             HSplitView {
                 sidebar
                     .frame(minWidth: 168, idealWidth: 176, maxWidth: 184)
 
-                detailContent
+                detailContent(section: model.selectedSection ?? .scanner)
             }
 
-            Divider()
-
-            HStack(spacing: 8) {
-                Button("Podgląd cleanupu") { model.preview() }
-                Spacer()
-                Button("Zapisz") { model.apply() }
-                Button("Zapisz i wyczyść teraz") { model.applyRun() }
-                    .keyboardShortcut(.defaultAction)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.bar)
+            saveBar
         }
         .frame(width: 920, height: 640)
+    }
+
+    private var saveBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 8) {
+                Button("Podgląd sprzątania") { model.preview() }
+                Spacer()
+                Button("Zapisz") { model.apply() }
+                    .buttonStyle(.borderedProminent)
+                Menu("Więcej", systemImage: "ellipsis") {
+                    Button("Zapisz i wyczyść teraz") { model.applyRun() }
+                }
+                .labelStyle(.iconOnly)
+                .fixedSize()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.bar)
+        }
     }
 
     private var sidebar: some View {
@@ -295,8 +320,8 @@ public struct SettingsView: View {
     }
 
     @ViewBuilder
-    private var detailContent: some View {
-        switch model.selectedSection ?? .scanner {
+    private func detailContent(section: SettingsSection) -> some View {
+        switch section {
         case .scanner:
             ScannerTab(settingsModel: model)
         case .general:
