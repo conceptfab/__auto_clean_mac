@@ -122,4 +122,21 @@ final class LeftoverPathProviderTests: XCTestCase {
         XCTAssertTrue(resolved.contains(daemons.appendingPathComponent("com.example.MyApp.privilegedhelper.plist").path))
         XCTAssertFalse(resolved.contains(daemons.appendingPathComponent("com.unrelated.plist").path))
     }
+
+    func test_rejects_unsafe_bundle_ids_and_display_names() {
+        for bad in ["", ".", "..", "../..", "com/evil", "a:b", ".hidden", "x/../.."] {
+            XCTAssertFalse(LeftoverPathProvider.isSafePathComponent(bad), bad)
+            XCTAssertTrue(LeftoverPathProvider.userPaths(bundleID: bad, displayName: nil, homeDirectory: home).isEmpty, bad)
+            XCTAssertTrue(LeftoverPathProvider.systemPaths(bundleID: bad, displayName: nil).isEmpty, bad)
+            XCTAssertTrue(LeftoverPathProvider.resolveDynamic(bundleID: bad, homeDirectory: home).isEmpty, bad)
+            XCTAssertTrue(LeftoverPathProvider.resolveDynamicSystem(bundleID: bad).isEmpty, bad)
+        }
+        // Niebezpieczna nazwa wyświetlana jest pomijana, bundle ID dalej obsługiwany.
+        let paths = LeftoverPathProvider.userPaths(bundleID: bundleID, displayName: "..", homeDirectory: home).map(\.path)
+        XCTAssertFalse(paths.contains("/Users/test/Library/Caches"))
+        XCTAssertFalse(paths.contains { $0.hasSuffix("/..") })
+        XCTAssertTrue(paths.contains("/Users/test/Library/Caches/com.example.MyApp"))
+        let system = LeftoverPathProvider.systemPaths(bundleID: bundleID, displayName: "Evil/../../x").map(\.path)
+        XCTAssertFalse(system.contains { $0.contains("Evil") })
+    }
 }

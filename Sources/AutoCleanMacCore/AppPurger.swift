@@ -91,7 +91,16 @@ public final class AppPurger: Sendable {
             items += metrics.itemsDeleted
             appRemoved = true
         } catch {
-            if fm.fileExists(atPath: appURL.path), deleter.mode != .dryRun {
+            // Odmowy z bramki ścieżek (poza korzeniem / sam korzeń) NIE mogą eskalować do `rm -rf` jako admin.
+            let refusedByPathGuard: Bool = {
+                switch error as? SafeDeleter.DeletionError {
+                case .outsideAllowedRoot?, .refusedRoot?, .excludedPath?: return true
+                default: return false
+                }
+            }()
+            if refusedByPathGuard {
+                failures.append(PurgeFailure(path: appURL.path, reason: (error as NSError).localizedDescription))
+            } else if fm.fileExists(atPath: appURL.path), deleter.mode != .dryRun {
                 let measured: SafeDeleter.DeletionMetrics
                 if case let SafeDeleter.DeletionError.removalFailed(_, m, _) = error {
                     // removeItem deletes bundle contents before failing on the parent, so
@@ -141,9 +150,18 @@ public final class AppPurger: Sendable {
 
         if includeSystemPaths {
             let systemLib = systemRoot.appendingPathComponent("Library")
+            // Te same zasady co `SafeDeleter` dla ścieżek idących do `rm -rf` z uprawnieniami admina:
+            // tylko ścisli potomkowie znanych katalogów (po rozwiązaniu symlinków), nigdy sam katalog.
+            let allowedSystemRoots = ["Preferences", "Application Support", "LaunchDaemons", "LaunchAgents", "PrivilegedHelperTools"]
+                .map { systemLib.appendingPathComponent($0) }
             let systemLeftovers = LeftoverPathProvider.systemPaths(bundleID: bundleID, displayName: displayName, systemRoot: systemRoot)
                 + LeftoverPathProvider.resolveDynamicSystem(bundleID: bundleID, systemRoot: systemRoot)
             for url in systemLeftovers where fm.fileExists(atPath: url.path) {
+                guard allowedSystemRoots.contains(where: { url.isStrictlyWithin($0) }) else {
+                    logger.log(event: "purge_system_refused", fields: ["path": url.path, "reason": "outside_allowed_root"])
+                    failures.append(PurgeFailure(path: url.path, reason: "Ścieżka poza dozwolonym katalogiem — pominięto."))
+                    continue
+                }
                 if url.isWithin(systemLib.appendingPathComponent("LaunchDaemons"))
                     || url.isWithin(systemLib.appendingPathComponent("LaunchAgents")) {
                     _ = launchAgents.unload(plist: url, domain: .system)

@@ -35,12 +35,57 @@ public struct OrphanScanner: Sendable {
         "org.cups.",
     ]
 
+    /// Wspólne/systemowe nazwy, których nigdy nie raportujemy jako sieroty, nawet jeśli żadna
+    /// zainstalowana aplikacja nie ma takiego bundle ID (porównanie bez rozróżniania wielkości liter).
+    /// Większość z nich i tak odpada na teście kształtu bundle ID — lista to druga linia obrony.
+    public static let deniedNames: Set<String> = [
+        "addressbook", "callhistorydb", "callhistorytransactions", "clouddocs", "cloudkit",
+        "code", "crashreporter", "dock", "fileprovider", "icloud", "knowledge", "mobilesync",
+        "steam", "syncservices", "google", "microsoft", "mozilla", "firefox", "jetbrains",
+        "adobe", "homebrew", "node-gyp", "pip", "pypoetry", "ms-playwright",
+    ]
+
+    /// Prefiksy współdzielonych komponentów (updatery, SDK crash-reporterów, grupy aplikacji) —
+    /// należą do wielu aplikacji naraz, więc ich brak w rejestrze niczego nie dowodzi.
+    public static let deniedPrefixes: [String] = [
+        "com.google.keystone",
+        "com.google.softwareupdate",
+        "com.microsoft.autoupdate",
+        "com.microsoft.office",
+        "com.microsoft.shared",
+        "com.adobe.",
+        "com.plausiblelabs.",
+        "com.crashlytics",
+        "io.fabric.",
+        "org.sparkle-project.",
+        "group.",
+        "systemgroup.",
+    ]
+
+    /// Nazwa musi wyglądać jak bundle ID w odwrotnej notacji DNS (co najmniej dwie kropki),
+    /// np. `com.vendor.App` — odpowiednik `^[A-Za-z0-9-]+(\.[A-Za-z0-9_-]+){2,}$`.
+    /// Foldery typu `MobileSync`, `Code`, `Steam` nie są sierotami aplikacji.
+    static func looksLikeBundleIdentifier(_ name: String) -> Bool {
+        let components = name.split(separator: ".", omittingEmptySubsequences: false)
+        guard components.count >= 3 else { return false }
+        func isAllowed(_ part: Substring, allowUnderscore: Bool) -> Bool {
+            !part.isEmpty && part.unicodeScalars.allSatisfy { c in
+                (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || (c >= "0" && c <= "9")
+                    || c == "-" || (allowUnderscore && c == "_")
+            }
+        }
+        guard isAllowed(components[0], allowUnderscore: false) else { return false }
+        return components.dropFirst().allSatisfy { isAllowed($0, allowUnderscore: true) }
+    }
+
     public init(minimumAgeDays: Int = 30) {
         self.minimumAgeDays = max(0, minimumAgeDays)
     }
 
     public func scan(homeDirectory: URL, installedBundleIDs: Set<String>) async -> [OrphanGroup] {
         let lib = homeDirectory.appendingPathComponent("Library")
+        // LaunchServices porównuje bundle ID bez rozróżniania wielkości liter.
+        let installedBundleIDs = Set(installedBundleIDs.map { $0.lowercased() })
 
         // Phase 1 — discovery (cheap: directory listings, name filtering, age check). No sizing yet.
         // Candidates are collected in scan order so within-group path ordering is preserved.
@@ -146,7 +191,11 @@ public struct OrphanScanner: Sendable {
     private func isCandidateOrphan(bundleID: String, installed: Set<String>) -> Bool {
         guard !bundleID.isEmpty, !bundleID.hasPrefix(".") else { return false }
         for prefix in Self.skippedPrefixes where bundleID.hasPrefix(prefix) { return false }
-        return !installed.contains(bundleID)
+        guard Self.looksLikeBundleIdentifier(bundleID) else { return false }
+        let lowered = bundleID.lowercased()
+        if Self.deniedNames.contains(lowered) { return false }
+        for prefix in Self.deniedPrefixes where lowered.hasPrefix(prefix) { return false }
+        return !installed.contains(lowered)
     }
 
     private func isOldEnough(_ url: URL) -> Bool {
@@ -156,6 +205,6 @@ public struct OrphanScanner: Sendable {
             return false
         }
         let age = Date().timeIntervalSince(modified)
-        return age >= TimeInterval(minimumAgeDays * 24 * 60 * 60)
+        return age >= TimeInterval(minimumAgeDays) * 24 * 60 * 60
     }
 }

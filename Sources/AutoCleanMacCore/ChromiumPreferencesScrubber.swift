@@ -1,19 +1,27 @@
 import Foundation
 
-/// Usuwa z plików Chromium `Preferences` / `Secure Preferences` stan przywracania sesji.
+/// Usuwa z pliku Chromium `Preferences` stan przywracania sesji.
 /// Samo skasowanie katalogu `Sessions/` nie wystarcza — przeglądarka odtwarza ostatnie karty
 /// z kluczy `sessions` i `profile.exit_type` w JSON-ie preferencji profilu.
+///
+/// CELOWO nie ruszamy:
+/// - klucza `session` — to ustawienia startowe użytkownika (`restore_on_startup`, `startup_urls`),
+/// - pliku `Secure Preferences` — jest chroniony MAC-iem; ręczna edycja powoduje reset ustawień.
 public enum ChromiumPreferencesScrubber {
     public enum ScrubError: Error {
         case invalidFormat
     }
 
-    private static let sessionTopLevelKeys = ["sessions", "saved_tab_groups", "session"]
+    private static let sessionTopLevelKeys = ["sessions", "saved_tab_groups"]
     private static let vendorNamespaces = ["brave", "vivaldi", "arc", "comet"]
     private static let vendorSessionKeys = ["sessions"]
 
-    /// Zwraca `true`, gdy plik został zmodyfikowany.
-    public static func scrubSessionRestoreData(at url: URL, fileManager: FileManager = .default) throws -> Bool {
+    /// Zwraca `true`, gdy plik został zmodyfikowany (albo — przy `write: false` — zostałby).
+    public static func scrubSessionRestoreData(
+        at url: URL,
+        fileManager: FileManager = .default,
+        write: Bool = true
+    ) throws -> Bool {
         guard fileManager.fileExists(atPath: url.path) else { return false }
 
         let data = try Data(contentsOf: url)
@@ -48,6 +56,7 @@ public enum ChromiumPreferencesScrubber {
         }
 
         guard changed else { return false }
+        guard write else { return true }
 
         let output = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
         try output.write(to: url, options: .atomic)

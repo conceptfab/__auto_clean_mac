@@ -1,13 +1,24 @@
 import Foundation
 
 public enum LeftoverPathProvider {
+    /// Czy wartość z Info.plist (niezaufana: `CFBundleIdentifier`, `CFBundleDisplayName`) może
+    /// bezpiecznie posłużyć jako JEDEN komponent ścieżki. Odrzuca puste, `.`/`..`, ukryte
+    /// (zaczynające się od `.`) oraz zawierające `/`, `:` lub NUL — inaczej `Caches/<id>`
+    /// mogłoby wskazać np. cały `~/Library/Caches` albo wyjść poza `~/Library`.
+    public static func isSafePathComponent(_ s: String) -> Bool {
+        guard !s.isEmpty, s != ".", s != "..", !s.hasPrefix(".") else { return false }
+        return !s.contains("/") && !s.contains(":") && !s.contains("\0")
+    }
+
     /// Ścieżki w obrębie `~/Library` powiązane z bundle ID i opcjonalną nazwą wyświetlaną aplikacji.
     /// Zwraca wszystkie kandydatury, niezależnie od istnienia na dysku — istnienie sprawdza wywołujący.
+    /// Dla niebezpiecznego bundle ID zwraca pustą listę; niebezpieczna nazwa jest pomijana.
     public static func userPaths(
         bundleID: String,
         displayName: String?,
         homeDirectory: URL
     ) -> [URL] {
+        guard isSafePathComponent(bundleID) else { return [] }
         let lib = homeDirectory.appendingPathComponent("Library")
         var paths: [URL] = [
             lib.appendingPathComponent("Preferences/\(bundleID).plist"),
@@ -21,7 +32,7 @@ public enum LeftoverPathProvider {
             lib.appendingPathComponent("Cookies/\(bundleID).binarycookies"),
             lib.appendingPathComponent("Application Scripts/\(bundleID)"),
         ]
-        if let name = displayName, !name.isEmpty, name != bundleID {
+        if let name = displayName, isSafePathComponent(name), name != bundleID {
             paths.append(lib.appendingPathComponent("Application Support/\(name)"))
             paths.append(lib.appendingPathComponent("Caches/\(name)"))
         }
@@ -36,6 +47,7 @@ extension LeftoverPathProvider {
         bundleID: String,
         homeDirectory: URL
     ) -> [URL] {
+        guard isSafePathComponent(bundleID) else { return [] }
         let fm = FileManager.default
         let lib = homeDirectory.appendingPathComponent("Library")
         var results: [URL] = []
@@ -78,6 +90,7 @@ extension LeftoverPathProvider {
         displayName: String?,
         systemRoot: URL = URL(fileURLWithPath: "/")
     ) -> [URL] {
+        guard isSafePathComponent(bundleID) else { return [] }
         let lib = systemRoot.appendingPathComponent("Library")
         var paths: [URL] = [
             lib.appendingPathComponent("Preferences/\(bundleID).plist"),
@@ -86,7 +99,7 @@ extension LeftoverPathProvider {
             lib.appendingPathComponent("LaunchAgents/\(bundleID).plist"),
             lib.appendingPathComponent("PrivilegedHelperTools/\(bundleID)"),
         ]
-        if let name = displayName, !name.isEmpty, name != bundleID {
+        if let name = displayName, isSafePathComponent(name), name != bundleID {
             paths.append(lib.appendingPathComponent("Application Support/\(name)"))
         }
         return paths
@@ -96,6 +109,7 @@ extension LeftoverPathProvider {
         bundleID: String,
         systemRoot: URL = URL(fileURLWithPath: "/")
     ) -> [URL] {
+        guard isSafePathComponent(bundleID) else { return [] }
         let fm = FileManager.default
         let lib = systemRoot.appendingPathComponent("Library")
         var results: [URL] = []

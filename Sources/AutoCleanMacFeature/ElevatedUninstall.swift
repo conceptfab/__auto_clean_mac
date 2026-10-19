@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 
 enum ElevatedUninstallError: Error, CustomStringConvertible {
     case scriptCompileFailed
@@ -15,50 +14,89 @@ enum ElevatedUninstallError: Error, CustomStringConvertible {
     }
 }
 
-@MainActor
+/// Skrypty uruchamiamy przez `/usr/bin/osascript` na wątku w tle — NIE przez `NSAppleScript`
+/// na main thread. Okno hasła administratora i samo `rm -rf` potrafią trwać minutami, a moduł
+/// działa wewnątrz jednego procesu menu-bar („CFAB Control”) — blokada main threadu zamroziłaby cały hub.
 enum ElevatedUninstall {
     /// Przenosi element do Kosza przez Finder. macOS sam pokaże prompt o hasło, jeśli trzeba.
-    static func trashViaFinder(_ url: URL) throws {
+    static func trashViaFinder(_ url: URL) async throws {
         let escaped = escapeForAppleScript(url.path)
         let source = """
         tell application "Finder"
             delete POSIX file "\(escaped)"
         end tell
         """
-        try runScript(source)
+        try await runScript(source)
     }
 
     /// Trwale usuwa element z autoryzacją administratora. macOS pokazuje standardowe okno hasła.
     /// Autoryzacja jest cache'owana ~5 minut, więc seria deinstalacji = jeden prompt.
-    static func removeWithAdmin(_ url: URL) throws {
-        try runScript(adminRemoveScript(for: url))
+    static func removeWithAdmin(_ url: URL) async throws {
+        try await runScript(adminRemoveScript(for: url))
     }
 
     /// AppleScript usuwający element z autoryzacją administratora: macOS pokazuje własne okno
     /// hasła (nigdy `sudo` w tle).
-    nonisolated static func adminRemoveScript(for url: URL) -> String {
+    static func adminRemoveScript(for url: URL) -> String {
         let escaped = escapeForAppleScript(url.path)
         return "do shell script \"rm -rf \" & quoted form of \"\(escaped)\" with administrator privileges"
     }
 
-    private nonisolated static func escapeForAppleScript(_ s: String) -> String {
+    private static func escapeForAppleScript(_ s: String) -> String {
         s.replacingOccurrences(of: "\\", with: "\\\\")
          .replacingOccurrences(of: "\"", with: "\\\"")
     }
 
-    private static func runScript(_ source: String) throws {
-        guard let script = NSAppleScript(source: source) else {
-            throw ElevatedUninstallError.scriptCompileFailed
+    private static func runScript(_ source: String) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try runScriptBlocking(source)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
         }
-        var errorDict: NSDictionary?
-        _ = script.executeAndReturnError(&errorDict)
-        guard let err = errorDict else { return }
+    }
 
-        let code = (err[NSAppleScript.errorNumber] as? Int) ?? 0
-        let message = (err[NSAppleScript.errorMessage] as? String) ?? "Nieznany błąd AppleScript."
+    /// Blokujące wykonanie przez `osascript` — wolno wołać wyłącznie poza main threadem.
+    private static func runScriptBlocking(_ source: String) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", source]
+        let stderr = Pipe()
+        process.standardError = stderr
+        process.standardOutput = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            throw ElevatedUninstallError.scriptFailed(code: -1, message: "Nie udało się uruchomić osascript: \(error)")
+        }
+        let errorData = stderr.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus != 0 else { return }
+
+        let message = String(data: errorData, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let code = appleScriptErrorCode(in: message) ?? Int(process.terminationStatus)
         if code == -128 {
             throw ElevatedUninstallError.userCancelled
         }
-        throw ElevatedUninstallError.scriptFailed(code: code, message: message)
+        if code == -2740 || code == -2741 {
+            throw ElevatedUninstallError.scriptCompileFailed
+        }
+        throw ElevatedUninstallError.scriptFailed(
+            code: code,
+            message: message.isEmpty ? "Nieznany błąd AppleScript." : message
+        )
+    }
+
+    /// `osascript` zgłasza błędy jako `0:42: execution error: User canceled. (-128)` —
+    /// wyciągamy numer z końcowego nawiasu.
+    static func appleScriptErrorCode(in message: String) -> Int? {
+        guard message.hasSuffix(")"), let open = message.lastIndex(of: "(") else { return nil }
+        let inner = message[message.index(after: open)..<message.index(before: message.endIndex)]
+        return Int(inner)
     }
 }

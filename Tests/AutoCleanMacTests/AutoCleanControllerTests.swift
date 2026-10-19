@@ -234,4 +234,10 @@ final class AutoCleanControllerTests: XCTestCase {
         XCTAssertFalse(script.contains("sudo"))
         XCTAssertTrue(script.contains("quoted form of \"/Applications/Some \\\"App\\\".app\""))
     }
+
+    func test_appleScriptErrorCode_parses_osascript_stderr() {
+        XCTAssertEqual(ElevatedUninstall.appleScriptErrorCode(in: "0:94: execution error: User canceled. (-128)"), -128)
+        XCTAssertEqual(ElevatedUninstall.appleScriptErrorCode(in: "0:10: execution error: rm: /x: Operation not permitted (1)"), 1)
+        XCTAssertNil(ElevatedUninstall.appleScriptErrorCode(in: "garbage"))
+    }
 }

@@ -40,7 +40,9 @@ public struct CleanupContext {
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         excludedPaths: [URL] = []
     ) {
-        self.retentionDays = retentionDays
+        // Obrona w głąb: nawet gdy ktoś poda retencję spoza zakresu (np. 0 = „usuń wszystko”),
+        // taski widzą wartość z bezpiecznego przedziału.
+        self.retentionDays = min(max(retentionDays, Config.retentionDaysRange.lowerBound), Config.retentionDaysRange.upperBound)
         self.deleter = deleter
         self.deletionMode = deletionMode
         self.logger = logger
@@ -88,7 +90,8 @@ public struct FileEnumerator {
             options: []
         ) else { return [] }
         let now = clock()
-        let cutoff = days.map { now.addingTimeInterval(TimeInterval(-$0 * 86_400)) }
+        // Arytmetyka na Double — `-days * 86_400` na Int przepełnia się (crash) dla dużych wartości.
+        let cutoff = days.map { now.addingTimeInterval(-TimeInterval($0) * 86_400) }
         var out: [URL] = []
         for case let url as URL in enumerator {
             let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .isRegularFileKey, .isSymbolicLinkKey, .isDirectoryKey])

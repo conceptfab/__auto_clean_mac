@@ -57,7 +57,7 @@ public struct BrowserDataTask: CleanupTask {
         if isBrowserRunning(browser) {
             let result = TaskResult(
                 bytesFreed: 0,
-                warnings: ["\(browser.displayName) ma otwarte okna — pomijam (zamknij przeglądarkę żeby wyczyścić)"],
+                warnings: ["\(browser.displayName) jest uruchomiona — pomijam (zamknij przeglądarkę żeby wyczyścić)"],
                 skipped: true,
                 skipReason: "browser running"
             )
@@ -92,14 +92,25 @@ public struct BrowserDataTask: CleanupTask {
         
         for profile in profilesToClean {
             if browser.isChromium && dataType == .history {
-                for preferencesName in ["Preferences", "Secure Preferences"] {
+                // Tylko `Preferences` — `Secure Preferences` jest chroniony MAC-iem (patrz scrubber).
+                for preferencesName in ["Preferences"] {
                     let preferencesURL = profile.appendingPathComponent(preferencesName)
                     guard context.fileManager.fileExists(atPath: preferencesURL.path) else { continue }
                     do {
-                        _ = try ChromiumPreferencesScrubber.scrubSessionRestoreData(
+                        // Przepisanie JSON-a jest nieodwracalne (nie trafia do Kosza), więc robimy
+                        // to wyłącznie w trybie live; w dry-run/trash tylko logujemy, co by się zmieniło.
+                        let isLive = context.deletionMode == .live && context.deleter.mode == .live
+                        let changed = try ChromiumPreferencesScrubber.scrubSessionRestoreData(
                             at: preferencesURL,
-                            fileManager: context.fileManager
+                            fileManager: context.fileManager,
+                            write: isLive
                         )
+                        if changed {
+                            context.logger.log(event: isLive ? "prefs_scrubbed" : "prefs_would_change", fields: [
+                                "path": preferencesURL.path,
+                                "mode": context.deletionMode.label,
+                            ])
+                        }
                     } catch {
                         if Self.isPermissionError(error) {
                             warnings.append("\(browser.displayName): brak dostępu do \(preferencesName) — nadaj aplikacji Pełny dostęp do dysku (Full Disk Access) w Ustawieniach systemowych › Prywatność i bezpieczeństwo")

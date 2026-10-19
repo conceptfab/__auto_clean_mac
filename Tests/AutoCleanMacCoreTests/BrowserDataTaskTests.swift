@@ -233,9 +233,55 @@ final class BrowserDataTaskTests: XCTestCase {
         XCTAssertNotNil(scrubbed["browser"])
         XCTAssertNil((scrubbed["brave"] as? [String: Any])?["sessions"])
 
-        let scrubbedSecure = try JSONSerialization.jsonObject(with: Data(contentsOf: securePrefsURL)) as! [String: Any]
-        XCTAssertNil(scrubbedSecure["sessions"])
-        XCTAssertEqual((scrubbedSecure["profile"] as? [String: Any])?["exit_type"] as? String, "Normal")
+        // Secure Preferences jest chroniony MAC-iem — nie wolno go modyfikować.
+        let untouchedSecure = try JSONSerialization.jsonObject(with: Data(contentsOf: securePrefsURL)) as! [String: Any]
+        XCTAssertNotNil(untouchedSecure["sessions"])
+        XCTAssertEqual((untouchedSecure["profile"] as? [String: Any])?["exit_type"] as? String, "Crashed")
+    }
+
+    func test_chrome_history_keeps_user_startup_settings_in_session_key() async throws {
+        let profile = tempDir.appendingPathComponent("Library/Application Support/Google/Chrome/Default")
+        let prefsURL = profile.appendingPathComponent("Preferences")
+        let prefs: [String: Any] = [
+            "session": ["restore_on_startup": 4, "startup_urls": ["https://example.com/"]],
+            "sessions": ["event_log": []],
+        ]
+        try FileManager.default.createDirectory(at: profile, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: prefs).write(to: prefsURL)
+
+        let task = BrowserDataTask(browser: .chrome, dataType: .history, isEnabled: true, isBrowserRunning: { _ in false })
+        _ = await task.run(context: context())
+
+        let scrubbed = try JSONSerialization.jsonObject(with: Data(contentsOf: prefsURL)) as! [String: Any]
+        XCTAssertNil(scrubbed["sessions"])
+        let session = try XCTUnwrap(scrubbed["session"] as? [String: Any])
+        XCTAssertEqual(session["restore_on_startup"] as? Int, 4)
+        XCTAssertEqual(session["startup_urls"] as? [String], ["https://example.com/"])
+    }
+
+    func test_chrome_history_does_not_rewrite_preferences_outside_live_mode() async throws {
+        let profile = tempDir.appendingPathComponent("Library/Application Support/Google/Chrome/Default")
+        let prefsURL = profile.appendingPathComponent("Preferences")
+        let prefs: [String: Any] = [
+            "sessions": ["event_log": []],
+            "profile": ["exit_type": "Crashed"],
+        ]
+        try FileManager.default.createDirectory(at: profile, withIntermediateDirectories: true)
+        let original = try JSONSerialization.data(withJSONObject: prefs)
+        try original.write(to: prefsURL)
+
+        for mode in [SafeDeleter.Mode.dryRun, .trash] {
+            let ctx = CleanupContext(
+                retentionDays: 7,
+                deleter: SafeDeleter(mode: mode, logger: logger),
+                deletionMode: mode,
+                logger: logger,
+                homeDirectory: tempDir
+            )
+            let task = BrowserDataTask(browser: .chrome, dataType: .history, isEnabled: true, isBrowserRunning: { _ in false })
+            _ = await task.run(context: ctx)
+            XCTAssertEqual(try Data(contentsOf: prefsURL), original, "Preferences zmienione w trybie \(mode)")
+        }
     }
 
     func test_chrome_history_also_deletes_session_restore_files() async throws {
@@ -255,5 +301,25 @@ final class BrowserDataTaskTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("Last Session").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: profile.appendingPathComponent("Sessions").path))
         XCTAssertTrue (FileManager.default.fileExists(atPath: profile.appendingPathComponent("Bookmarks").path))
+    }
+
+    // MARK: - BrowserRunning
+
+    func test_browser_running_when_process_exists_even_without_windows() {
+        // Dawniej liczyły się tylko widoczne okna — zminimalizowana przeglądarka była „zamknięta”.
+        XCTAssertTrue(BrowserRunning.isRunning(.chrome, runningBundleIDs: ["com.google.Chrome"], homeDirectory: tempDir))
+        XCTAssertFalse(BrowserRunning.isRunning(.chrome, runningBundleIDs: ["com.brave.Browser"], homeDirectory: tempDir))
+    }
+
+    func test_browser_running_honors_live_chromium_singleton_lock() throws {
+        let root = tempDir.appendingPathComponent("Library/Application Support/Google/Chrome")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            atPath: root.appendingPathComponent("SingletonLock").path,
+            withDestinationPath: "My-Mac.local-4242"
+        )
+        XCTAssertTrue(BrowserRunning.isRunning(.chrome, runningBundleIDs: [], homeDirectory: tempDir, isProcessAlive: { $0 == 4242 }))
+        // Pozostałość po crashu (proces nie żyje) nie blokuje czyszczenia.
+        XCTAssertFalse(BrowserRunning.isRunning(.chrome, runningBundleIDs: [], homeDirectory: tempDir, isProcessAlive: { _ in false }))
     }
 }

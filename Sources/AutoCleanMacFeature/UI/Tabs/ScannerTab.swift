@@ -8,15 +8,27 @@ final class ScannerViewModel: ObservableObject {
     @Published var results: [(name: String, result: TaskResult)] = []
     @Published var totalBytes: Int64 = 0
     @Published var totalItems: Int = 0
+    @Published var errorMessage: String?
 
     func scan(config: Config) async {
-        isScanning = true
         results.removeAll()
         totalBytes = 0
         totalItems = 0
-        
+        errorMessage = nil
+
+        // Brak miejsca na dysku / plik w miejscu katalogu nie może wywrócić całego huba —
+        // pokazujemy błąd zamiast `try!`.
         let tempLogDir = FileManager.default.temporaryDirectory.appendingPathComponent("AutoCleanMacScannerLogs")
-        let logger = try! Logger(directory: tempLogDir)
+        let logger: Logger
+        do {
+            logger = try Logger(directory: tempLogDir)
+        } catch {
+            NSLog("AutoCleanMac: failed to create scanner logger at \(tempLogDir.path): \(error)")
+            errorMessage = "Nie udało się przygotować skanowania: \(error.localizedDescription)"
+            hasScanned = false
+            return
+        }
+        isScanning = true
         let deleter = SafeDeleter(mode: .dryRun, logger: logger)
         let ctx = CleanupContext(
             retentionDays: config.retentionDays,
@@ -75,6 +87,18 @@ public struct ScannerTab: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
+                } else if let errorMessage = viewModel.errorMessage {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .resizable()
+                        .frame(width: 48, height: 48)
+                        .foregroundStyle(.orange)
+                    Text("Skanowanie nie powiodło się")
+                        .font(.headline)
+                    Text(errorMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 } else {
                     Image(systemName: "sparkles")
                         .resizable()

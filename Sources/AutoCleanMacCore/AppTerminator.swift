@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
 
 /// Best-effort terminacja działającej aplikacji przed jej usunięciem.
 /// Logika oparta na `__mole/lib/core/app_protection.sh:force_kill_app`.
@@ -9,84 +12,87 @@ public protocol AppTerminator: Sendable {
     func terminate(bundleID: String, executableName: String?) async -> Bool
 }
 
+/// Minimalny interfejs uruchomionej aplikacji (testowalny zamiennik `NSRunningApplication`).
+protocol TerminatableApp: AnyObject {
+    var hasExited: Bool { get }
+    @discardableResult func terminate() -> Bool
+    @discardableResult func forceTerminate() -> Bool
+}
+
+#if canImport(AppKit)
+extension NSRunningApplication: TerminatableApp {
+    /// `isTerminated` aktualizuje się przez main run loop; dodatkowo sprawdzamy PID przez `kill(pid, 0)`,
+    /// żeby odpytywanie działało także, gdy main thread jest zajęty.
+    var hasExited: Bool {
+        if isTerminated { return true }
+        let pid = processIdentifier
+        guard pid > 0 else { return true }
+        return kill(pid, 0) != 0 && errno == ESRCH
+    }
+}
+#endif
+
+/// Zamyka aplikację po bundle ID przez `NSRunningApplication`: najpierw łagodne `terminate()`
+/// (Apple Event „quit”), potem `forceTerminate()`, za każdym razem z prawdziwym limitem czasu
+/// (odpytywanie stanu procesu — nic nie blokuje wątku bez końca).
+/// Nazwa zachowana dla zgodności; nie używa już `pgrep`/`pkill`/`osascript`.
 public struct ShellAppTerminator: AppTerminator {
-    public init() {}
+    private let runningApps: @Sendable (String) -> [TerminatableApp]
+    private let gracefulTimeout: TimeInterval
+    private let forceTimeout: TimeInterval
+    private let pollInterval: TimeInterval
 
+    public init() {
+        self.init(
+            runningApps: Self.systemRunningApps,
+            gracefulTimeout: 3,
+            forceTimeout: 2,
+            pollInterval: 0.1
+        )
+    }
+
+    init(
+        runningApps: @escaping @Sendable (String) -> [TerminatableApp],
+        gracefulTimeout: TimeInterval,
+        forceTimeout: TimeInterval,
+        pollInterval: TimeInterval
+    ) {
+        self.runningApps = runningApps
+        self.gracefulTimeout = gracefulTimeout
+        self.forceTimeout = forceTimeout
+        self.pollInterval = pollInterval
+    }
+
+    /// `executableName` jest ignorowane — identyfikujemy procesy wyłącznie po bundle ID
+    /// (dopasowanie po nazwie procesu mogłoby trafić w obcy proces).
     public func terminate(bundleID: String, executableName: String?) async -> Bool {
-        let match = executableName?.isEmpty == false ? executableName! : bundleID
+        guard !bundleID.isEmpty else { return true }
+        let apps = runningApps(bundleID).filter { !$0.hasExited }
+        guard !apps.isEmpty else { return true }
 
-        guard isRunning(match: match) else { return true }
+        // 1) Łagodne zamknięcie — aplikacja może zapisać stan (Tauri/Electron/SwiftUI).
+        for app in apps { app.terminate() }
+        if await waitUntilExited(apps, timeout: gracefulTimeout) { return true }
 
-        // 1) Apple Event "quit" przez osascript — zarządza Tauri/Electron/SwiftUI poprawnie.
-        if !bundleID.isEmpty {
-            _ = await runWithTimeout(seconds: 3) {
-                let p = Process()
-                p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-                p.arguments = ["-e", "tell application id \"\(bundleID)\" to quit"]
-                let null = FileHandle(forWritingAtPath: "/dev/null")
-                p.standardOutput = null
-                p.standardError = null
-                try? p.run()
-                p.waitUntilExit()
-            }
-            // Daj procesowi do 2s na łagodne zamknięcie.
-            for _ in 0..<20 {
-                if !isRunning(match: match) { return true }
-                try? await Task.sleep(nanoseconds: 100_000_000)
-            }
-        }
-
-        // 2) SIGTERM
-        runPkill(args: ["-x", match])
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
-        if !isRunning(match: match) { return true }
-
-        // 3) SIGKILL
-        runPkill(args: ["-9", "-x", match])
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
-        return !isRunning(match: match)
+        // 2) Wymuszenie (SIGKILL) dla tych, które nadal żyją.
+        for app in apps where !app.hasExited { app.forceTerminate() }
+        return await waitUntilExited(apps, timeout: forceTimeout)
     }
 
-    private func isRunning(match: String) -> Bool {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        p.arguments = ["-x", match]
-        let null = FileHandle(forWritingAtPath: "/dev/null")
-        p.standardOutput = null
-        p.standardError = null
-        do {
-            try p.run()
-            p.waitUntilExit()
-            return p.terminationStatus == 0
-        } catch {
-            return false
+    private func waitUntilExited(_ apps: [TerminatableApp], timeout: TimeInterval) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while true {
+            if apps.allSatisfy({ $0.hasExited }) { return true }
+            if Date() >= deadline { return false }
+            try? await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
         }
     }
 
-    private func runPkill(args: [String]) {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        p.arguments = args
-        let null = FileHandle(forWritingAtPath: "/dev/null")
-        p.standardOutput = null
-        p.standardError = null
-        try? p.run()
-        p.waitUntilExit()
-    }
-
-    private func runWithTimeout(seconds: TimeInterval, _ work: @escaping @Sendable () -> Void) async -> Bool {
-        await withTaskGroup(of: Bool.self) { group in
-            group.addTask {
-                work()
-                return true
-            }
-            group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                return false
-            }
-            let result = await group.next() ?? false
-            group.cancelAll()
-            return result
-        }
+    private static let systemRunningApps: @Sendable (String) -> [TerminatableApp] = { bundleID in
+        #if canImport(AppKit)
+        return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+        #else
+        return []
+        #endif
     }
 }

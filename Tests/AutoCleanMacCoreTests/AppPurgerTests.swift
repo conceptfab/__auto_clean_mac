@@ -471,4 +471,51 @@ final class AppPurgerTests: XCTestCase {
         XCTAssertEqual(Array(events.prefix(3)), ["terminate", "loginItems", "unregister"])
         XCTAssertFalse(events.contains("rebuild"), "rebuild() is a batch concern, not per-app")
     }
+
+    func test_purge_never_elevates_system_path_that_escapes_allowed_root() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("AppPurger-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: temp) }
+        let appURL = temp.appendingPathComponent("Applications/Tiny.app")
+        try FileManager.default.createDirectory(at: appURL, withIntermediateDirectories: true)
+        let precious = temp.appendingPathComponent("precious")
+        try FileManager.default.createDirectory(at: precious, withIntermediateDirectories: true)
+        try Data(repeating: 1, count: 10).write(to: precious.appendingPathComponent("data"))
+        // `/Library/Application Support/Tiny` jako symlink wychodzący poza dozwolony katalog.
+        let support = temp.appendingPathComponent("Library/Application Support")
+        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: support.appendingPathComponent("Tiny"), withDestinationURL: precious)
+        // Prawidłowy leftover systemowy — ten może iść do elewacji.
+        let helper = temp.appendingPathComponent("Library/PrivilegedHelperTools/com.example.Tiny")
+        try FileManager.default.createDirectory(at: helper.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(repeating: 1, count: 10).write(to: helper)
+
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        var elevatedCalls: [URL] = []
+        let purger = AppPurger(
+            deleter: SafeDeleter(mode: .live, logger: logger),
+            prefsDaemon: SpyPreferencesDaemon(),
+            launchAgents: SpyLaunchAgentClient(),
+            terminator: SpyAppTerminator(),
+            loginItems: SpyLoginItemsClient(),
+            launchServices: SpyLaunchServicesClient(),
+            elevatedRemove: { url in
+                elevatedCalls.append(url)
+                try FileManager.default.removeItem(at: url)
+            },
+            logger: logger
+        )
+
+        let outcome = await purger.purge(
+            bundleID: "com.example.Tiny",
+            displayName: "Tiny",
+            appURL: appURL,
+            homeDirectory: temp.appendingPathComponent("home"),
+            systemRoot: temp,
+            includeSystemPaths: true
+        )
+
+        XCTAssertEqual(elevatedCalls.map(\.lastPathComponent), ["com.example.Tiny"])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: precious.appendingPathComponent("data").path))
+        XCTAssertTrue(outcome.failures.contains { $0.path.hasSuffix("Application Support/Tiny") })
+    }
 }

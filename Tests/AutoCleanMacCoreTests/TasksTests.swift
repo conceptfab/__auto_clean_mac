@@ -27,15 +27,52 @@ final class TasksTests: XCTestCase {
 
     // MARK: - TrashTask
 
-    func test_trash_deletes_files_older_than_retention() async throws {
+    func test_trash_deletes_items_trashed_before_retention() async throws {
         let trash = tempDir.appendingPathComponent(".Trash")
-        try Fixtures.makeFile(at: trash.appendingPathComponent("old.txt"), size: 100, ageInDays: 30)
-        try Fixtures.makeFile(at: trash.appendingPathComponent("fresh.txt"), size: 100, ageInDays: 1)
-        let task = TrashTask(isEnabled: true)
+        try Fixtures.makeFile(at: trash.appendingPathComponent("old.txt"), size: 100, ageInDays: 0)
+        try Fixtures.makeFile(at: trash.appendingPathComponent("fresh.txt"), size: 100, ageInDays: 0)
+        let task = TrashTask(isEnabled: true, trashedDate: { url in
+            let days = url.lastPathComponent == "old.txt" ? 30 : 1
+            return Date().addingTimeInterval(TimeInterval(-days * 86_400))
+        })
         let result = await task.run(context: makeContext())
         XCTAssertEqual(result.bytesFreed, 100)
         XCTAssertFalse(FileManager.default.fileExists(atPath: trash.appendingPathComponent("old.txt").path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: trash.appendingPathComponent("fresh.txt").path))
+    }
+
+    /// Regresja: plik edytowany dawno temu, ale wrzucony do Kosza dziś, nie może zniknąć.
+    func test_trash_keeps_recently_trashed_item_with_old_content_mtime() async throws {
+        let trash = tempDir.appendingPathComponent(".Trash")
+        let file = trash.appendingPathComponent("old-content.txt")
+        try Fixtures.makeFile(at: file, size: 100, ageInDays: 400)
+        let result = await TrashTask(isEnabled: true).run(context: makeContext())
+        XCTAssertEqual(result.bytesFreed, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    func test_trash_default_trashed_date_ignores_content_mtime() throws {
+        let file = tempDir.appendingPathComponent(".Trash/doc.txt")
+        try Fixtures.makeFile(at: file, size: 10, ageInDays: 400)
+        let date = try XCTUnwrap(TrashTask.defaultTrashedDate(file))
+        XCTAssertLessThan(abs(date.timeIntervalSinceNow), 3_600)
+    }
+
+    func test_trash_handles_top_level_folders_as_whole_items() async throws {
+        let trash = tempDir.appendingPathComponent(".Trash")
+        // Świeżo wyrzucony folder ze starymi plikami w środku — nie ruszamy jego zawartości.
+        try Fixtures.makeFile(at: trash.appendingPathComponent("FreshFolder/inner-old.txt"), size: 40, ageInDays: 400)
+        // Dawno wyrzucony folder — usuwany w całości.
+        try Fixtures.makeFile(at: trash.appendingPathComponent("OldFolder/a.txt"), size: 30, ageInDays: 0)
+        try Fixtures.makeFile(at: trash.appendingPathComponent("OldFolder/sub/b.txt"), size: 20, ageInDays: 0)
+        let task = TrashTask(isEnabled: true, trashedDate: { url in
+            let days = url.lastPathComponent == "OldFolder" ? 30 : 0
+            return Date().addingTimeInterval(TimeInterval(-days * 86_400))
+        })
+        let result = await task.run(context: makeContext())
+        XCTAssertEqual(result.bytesFreed, 50)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: trash.appendingPathComponent("OldFolder").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: trash.appendingPathComponent("FreshFolder/inner-old.txt").path))
     }
 
     func test_trash_skipped_when_disabled() async throws {
@@ -85,20 +122,62 @@ final class TasksTests: XCTestCase {
         let temp = tempDir.appendingPathComponent("temp-root")
         try Fixtures.makeFile(at: temp.appendingPathComponent("old.tmp"),   size: 80, ageInDays: 30)
         try Fixtures.makeFile(at: temp.appendingPathComponent("fresh.tmp"), size: 80, ageInDays: 1)
-        let task = SystemTempTask(isEnabled: true, rootOverride: temp)
+        let task = SystemTempTask(isEnabled: true, rootOverride: temp, isIdleSince: { _, _ in true })
         let result = await task.run(context: makeContext())
         XCTAssertEqual(result.bytesFreed, 80)
     }
 
+    func test_system_temp_keeps_old_mtime_file_that_was_recently_accessed_or_changed() async throws {
+        let temp = tempDir.appendingPathComponent("temp-root")
+        let file = temp.appendingPathComponent("in-use.sock-data")
+        try Fixtures.makeFile(at: file, size: 80, ageInDays: 30)
+        // Domyślna implementacja: świeży ctime/atime (plik dopiero utworzony) → nie usuwamy.
+        let result = await SystemTempTask(isEnabled: true, rootOverride: temp).run(context: makeContext())
+        XCTAssertEqual(result.bytesFreed, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    func test_system_temp_default_idle_check_uses_access_and_attribute_dates() throws {
+        let file = tempDir.appendingPathComponent("x.tmp")
+        try Fixtures.makeFile(at: file, size: 1, ageInDays: 30)
+        let cutoff = Date().addingTimeInterval(-7 * 86_400)
+        XCTAssertFalse(SystemTempTask.defaultIsIdleSince(file, cutoff: cutoff))
+        XCTAssertTrue(SystemTempTask.defaultIsIdleSince(file, cutoff: Date().addingTimeInterval(60)))
+    }
+
     // MARK: - UserCachesTask
 
-    func test_user_caches_deletes_all_files_regardless_of_mtime() async throws {
+    func test_user_caches_deletes_only_files_older_than_retention() async throws {
         let caches = tempDir.appendingPathComponent("Library/Caches")
         try Fixtures.makeFile(at: caches.appendingPathComponent("a/x.bin"),  size: 100, ageInDays: 0)
         try Fixtures.makeFile(at: caches.appendingPathComponent("b/y.bin"),  size: 200, ageInDays: 30)
         let task = UserCachesTask(isEnabled: true, isBundleIDRunning: { _ in false })
         let result = await task.run(context: makeContext())
-        XCTAssertEqual(result.bytesFreed, 300)
+        XCTAssertEqual(result.bytesFreed, 200)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: caches.appendingPathComponent("a/x.bin").path))
+    }
+
+    func test_user_caches_skips_state_bearing_folders_and_incomplete_downloads() async throws {
+        let caches = tempDir.appendingPathComponent("Library/Caches")
+        let keep = [
+            "pypoetry/virtualenvs/proj-py3.12/bin/python",
+            "ms-playwright/chromium-1100/chrome",
+            "Homebrew/downloads/abc--node.tar.gz.incomplete",
+        ]
+        for path in keep {
+            try Fixtures.makeFile(at: caches.appendingPathComponent(path), size: 10, ageInDays: 30)
+        }
+        try Fixtures.makeFile(at: caches.appendingPathComponent("pypoetry/cache/x.whl"), size: 7, ageInDays: 30)
+        try Fixtures.makeFile(at: caches.appendingPathComponent("go-build/aa/bb"), size: 5, ageInDays: 30)
+
+        let task = UserCachesTask(isEnabled: true, isBundleIDRunning: { _ in false })
+        let result = await task.run(context: makeContext())
+
+        XCTAssertEqual(result.bytesFreed, 12)
+        for path in keep {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: caches.appendingPathComponent(path).path), path)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: caches.appendingPathComponent("go-build/aa/bb").path))
     }
 
     func test_user_caches_skips_protected_top_level_directories() async throws {
@@ -373,6 +452,23 @@ final class TasksTests: XCTestCase {
     }
 
     // MARK: - ProjectArtifactsTask
+
+    func test_dev_caches_never_resolves_pip3_from_usr_bin_stub() {
+        XCTAssertFalse(DevCachesTask.executableSearchDirectories(for: "pip3").contains("/usr/bin"))
+        XCTAssertTrue(DevCachesTask.executableSearchDirectories(for: "pip3").contains("/opt/homebrew/bin"))
+        XCTAssertTrue(DevCachesTask.executableSearchDirectories(for: "npm").contains("/usr/bin"))
+    }
+
+    func test_dev_caches_child_environment_sets_explicit_path() {
+        let env = DevCachesTask.childEnvironment(
+            forExecutable: "/Users/x/.local/bin/mise",
+            base: ["PATH": "/usr/bin:/bin", "HOME": "/Users/x"]
+        )
+        XCTAssertEqual(env["PATH"], "/Users/x/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin")
+        XCTAssertEqual(env["HOME"], "/Users/x")
+        let brew = DevCachesTask.childEnvironment(forExecutable: "/opt/homebrew/bin/npm", base: [:])
+        XCTAssertEqual(brew["PATH"], "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin")
+    }
 
     func test_project_artifacts_task_skipped_when_disabled() async throws {
         let task = ProjectArtifactsTask(isEnabled: false, searchRoots: [tempDir])

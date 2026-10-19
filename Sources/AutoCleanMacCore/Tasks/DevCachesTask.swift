@@ -166,11 +166,35 @@ public struct DevCachesTask: CleanupTask {
     }
 
     private static func findExecutable(_ name: String) -> String? {
-        for path in ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"] {
+        for path in executableSearchDirectories(for: name) {
             let full = "\(path)/\(name)"
             if FileManager.default.isExecutableFile(atPath: full) { return full }
         }
         return nil
+    }
+
+    /// Narzędzia, których `/usr/bin/<nazwa>` to stub Command Line Tools — uruchomienie go bez
+    /// zainstalowanych CLT wyświetla systemowe okno instalacji (z tła, bez kontekstu).
+    static let commandLineToolsStubNames: Set<String> = ["pip3", "python3"]
+
+    static func executableSearchDirectories(for name: String) -> [String] {
+        let dirs = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+        return commandLineToolsStubNames.contains(name) ? dirs.filter { $0 != "/usr/bin" } : dirs
+    }
+
+    /// Środowisko procesu potomnego: LaunchAgent dziedziczy z launchd ubogi PATH (bez
+    /// `/opt/homebrew/bin`), przez co np. `npm` nie znajdzie `node`. Ustawiamy PATH jawnie,
+    /// z katalogiem samego narzędzia na początku.
+    static func childEnvironment(forExecutable path: String, base: [String: String]) -> [String: String] {
+        var env = base
+        let toolDir = (path as NSString).deletingLastPathComponent
+        var dirs = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
+        if !toolDir.isEmpty {
+            dirs.removeAll { $0 == toolDir }
+            dirs.insert(toolDir, at: 0)
+        }
+        env["PATH"] = dirs.joined(separator: ":")
+        return env
     }
 
     struct ProcessOutcome {
@@ -250,6 +274,7 @@ public struct DevCachesTask: CleanupTask {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         process.arguments = args
+        process.environment = childEnvironment(forExecutable: path, base: ProcessInfo.processInfo.environment)
 
         let tempDir = FileManager.default.temporaryDirectory
         let stdoutURL = tempDir.appendingPathComponent("autocleanmac-brew-\(UUID().uuidString).stdout")

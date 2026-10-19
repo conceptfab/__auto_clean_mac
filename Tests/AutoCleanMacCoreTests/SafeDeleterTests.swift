@@ -217,4 +217,25 @@ final class SafeDeleterTests: XCTestCase {
         XCTAssertTrue(bridged.contains("Removal failed for /tmp/x"), "got: \(bridged)")
         XCTAssertFalse(bridged.contains("couldn't be completed"), "got generic fallback: \(bridged)")
     }
+
+    func test_delete_refuses_root_itself() throws {
+        let root = tempDir.appendingPathComponent("root")
+        try Fixtures.makeFile(at: root.appendingPathComponent("keep.txt"), size: 10)
+        let deleter = SafeDeleter(mode: .live, logger: logger)
+        for target in [root, root.appendingPathComponent("."), root.appendingPathComponent("sub/..")] {
+            XCTAssertThrowsError(try deleter.delete(target, withinRoot: root)) { error in
+                guard case SafeDeleter.DeletionError.refusedRoot = error else {
+                    return XCTFail("expected refusedRoot, got \(error)")
+                }
+            }
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("keep.txt").path))
+    }
+
+    func test_isStrictlyWithin_excludes_root_itself() {
+        let root = URL(fileURLWithPath: "/Users/x/Library/LaunchAgents")
+        XCTAssertFalse(root.isStrictlyWithin(root))
+        XCTAssertTrue(URL(fileURLWithPath: "/Users/x/Library/LaunchAgents/a.plist").isStrictlyWithin(root))
+        XCTAssertFalse(URL(fileURLWithPath: "/Users/x/Library/LaunchAgents-Backup/a.plist").isStrictlyWithin(root))
+    }
 }

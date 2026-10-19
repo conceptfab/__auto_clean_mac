@@ -67,6 +67,50 @@ final class ConfigTests: XCTestCase {
         ])
     }
 
+    func test_retention_days_zero_or_negative_falls_back_to_default_and_warns() throws {
+        for raw in [0, -5] {
+            let file = tempDir.appendingPathComponent("r\(raw).json")
+            try "{ \"retention_days\": \(raw) }".write(to: file, atomically: true, encoding: .utf8)
+            var warnings: [String] = []
+            let config = Config.loadOrDefault(from: file, warn: { warnings.append($0) })
+            XCTAssertEqual(config.retentionDays, 7)
+            XCTAssertFalse(warnings.isEmpty)
+        }
+    }
+
+    func test_retention_days_huge_value_is_clamped() throws {
+        let file = tempDir.appendingPathComponent("huge.json")
+        try "{ \"retention_days\": 9223372036854775807 }".write(to: file, atomically: true, encoding: .utf8)
+        var warnings: [String] = []
+        let config = Config.loadOrDefault(from: file, warn: { warnings.append($0) })
+        XCTAssertEqual(config.retentionDays, 3650)
+        XCTAssertFalse(warnings.isEmpty)
+    }
+
+    func test_cleanup_context_clamps_retention_and_enumerator_does_not_overflow() throws {
+        let logger = try Logger(directory: tempDir.appendingPathComponent("logs"))
+        let ctx = CleanupContext(retentionDays: 0, deleter: SafeDeleter(mode: .dryRun, logger: logger), logger: logger)
+        XCTAssertEqual(ctx.retentionDays, 1)
+        // Nie może się wywrócić na przepełnieniu Int (dawniej `-days * 86_400`).
+        _ = FileEnumerator.files(inRoot: tempDir, olderThanDays: Int.max)
+    }
+
+    func test_relative_excluded_paths_are_ignored_with_warning() throws {
+        let file = tempDir.appendingPathComponent("rel.json")
+        let json = """
+        { "excluded_paths": ["Documents/Keep", "~/Keep", "/abs/keep", "./x", "~other/x"] }
+        """
+        try json.write(to: file, atomically: true, encoding: .utf8)
+        var warnings: [String] = []
+        let config = Config.loadOrDefault(from: file, warn: { warnings.append($0) })
+        XCTAssertEqual(config.excludedPaths, ["~/Keep", "/abs/keep"])
+        XCTAssertEqual(warnings.count, 3)
+
+        var manual = Config.default
+        manual.excludedPaths = ["relative/path", "/abs"]
+        XCTAssertEqual(manual.resolvedExcludedPathURLs(homeDirectory: tempDir).map(\.path), ["/abs"])
+    }
+
     func test_malformed_json_falls_back_to_defaults_and_warns() throws {
         let file = tempDir.appendingPathComponent("bad.json")
         try "{ not valid json".write(to: file, atomically: true, encoding: .utf8)

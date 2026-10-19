@@ -1,44 +1,68 @@
 import Foundation
 #if canImport(AppKit)
 import AppKit
-import CoreGraphics
 #endif
 
 /// Wykrywa czy dana przeglądarka jest aktualnie uruchomiona. Jeśli AppKit niedostępny
-/// (np. testy na Linuksie) zawsze zwraca false — wtedy taski po prostu będą usuwać pliki
-/// jakby browser był zamknięty.
+/// (np. testy na Linuksie) sprawdzana jest tylko blokada profilu Chromium.
 public enum BrowserRunning {
     public static func isRunning(_ browser: BrowserIdentity) -> Bool {
-        #if canImport(AppKit)
-        return NSWorkspace.shared.runningApplications.contains { app in
-            guard let bundleID = app.bundleIdentifier,
-                  browser.bundleIdentifiers.contains(bundleID) else { return false }
-            // Proces główny Chromium może żyć w tle po zamknięciu okien
-            // (ustawienie „Continue running apps in background”). Pomijamy cleanup
-            // tylko gdy przeglądarka ma widoczne okna.
-            return hasVisibleWindows(processID: app.processIdentifier)
+        isRunning(
+            browser,
+            runningBundleIDs: currentRunningBundleIDs(for: browser),
+            homeDirectory: FileManager.default.homeDirectoryForCurrentUser
+        )
+    }
+
+    /// Przeglądarka liczy się jako uruchomiona, gdy żyje jakikolwiek jej proces — także
+    /// zminimalizowany, ukryty, na innym Space albo działający w tle bez okien. Wtedy jej bazy
+    /// SQLite są otwarte i nie wolno ich kasować. Dodatkowo dla Chromium honorujemy
+    /// `SingletonLock` (np. przeglądarka uruchomiona z innego bundle'a / innej kopii).
+    static func isRunning(
+        _ browser: BrowserIdentity,
+        runningBundleIDs: Set<String>,
+        homeDirectory: URL,
+        isProcessAlive: (pid_t) -> Bool = BrowserRunning.isProcessAlive
+    ) -> Bool {
+        if browser.bundleIdentifiers.contains(where: runningBundleIDs.contains) {
+            return true
         }
+        guard browser.isChromium else { return false }
+        return browser.applicationSupportProfileRoots(homeDirectory: homeDirectory).contains { root in
+            hasLiveSingletonLock(in: root, isProcessAlive: isProcessAlive)
+        }
+    }
+
+    private static func currentRunningBundleIDs(for browser: BrowserIdentity) -> Set<String> {
+        #if canImport(AppKit)
+        var result: Set<String> = []
+        for bundleID in browser.bundleIdentifiers {
+            let alive = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+                .contains { !$0.isTerminated }
+            if alive { result.insert(bundleID) }
+        }
+        return result
         #else
-        return false
+        return []
         #endif
     }
 
-    #if canImport(AppKit)
-    static func hasVisibleWindows(processID: pid_t) -> Bool {
-        guard let windowList = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly, .excludeDesktopElements],
-            kCGNullWindowID
-        ) as? [[String: Any]] else {
+    /// Chromium trzyma w katalogu danych symlink `SingletonLock` → `<host>-<pid>`. Po crashu
+    /// symlink potrafi zostać, więc liczy się tylko wtedy, gdy proces o tym PID-zie żyje.
+    /// Gdy celu nie da się sparsować — zachowawczo uznajemy przeglądarkę za uruchomioną.
+    static func hasLiveSingletonLock(in root: URL, isProcessAlive: (pid_t) -> Bool) -> Bool {
+        let lock = root.appendingPathComponent("SingletonLock")
+        guard let target = try? FileManager.default.destinationOfSymbolicLink(atPath: lock.path) else {
             return false
         }
-
-        return windowList.contains { info in
-            guard let ownerPID = info[kCGWindowOwnerPID as String] as? Int32,
-                  ownerPID == processID else { return false }
-            let layer = info[kCGWindowLayer as String] as? Int ?? 0
-            let alpha = info[kCGWindowAlpha as String] as? Double ?? 0
-            return layer == 0 && alpha > 0
+        guard let pidPart = target.split(separator: "-").last, let pid = pid_t(pidPart), pid > 0 else {
+            return true
         }
+        return isProcessAlive(pid)
     }
-    #endif
+
+    static func isProcessAlive(_ pid: pid_t) -> Bool {
+        if kill(pid, 0) == 0 { return true }
+        return errno == EPERM
+    }
 }

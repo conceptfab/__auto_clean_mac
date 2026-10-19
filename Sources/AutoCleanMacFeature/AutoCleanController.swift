@@ -293,7 +293,7 @@ public final class AutoCleanController {
         case "full_disk_access_required":
             return "wymaga Full Disk Access"
         case "browser running":
-            return "przeglądarka ma otwarte okna"
+            return "przeglądarka jest uruchomiona"
         case "no browser profile directories":
             return "brak katalogów profilu"
         case "disabled":
@@ -485,19 +485,18 @@ public final class AutoCleanController {
                     loginItems: ShellLoginItemsClient(),
                     launchServices: launchServices,
                     elevatedRemove: { url in
-                        try await MainActor.run {
-                            if mode == .trash {
-                                do {
-                                    try ElevatedUninstall.trashViaFinder(url)
-                                    if !FileManager.default.fileExists(atPath: url.path) { return }
-                                } catch ElevatedUninstallError.userCancelled {
-                                    throw ElevatedUninstallError.userCancelled
-                                } catch {
-                                    // fallback to admin rm
-                                }
+                        // Skrypty wykonują się w tle (osascript) — main thread huba pozostaje wolny.
+                        if mode == .trash {
+                            do {
+                                try await ElevatedUninstall.trashViaFinder(url)
+                                if !FileManager.default.fileExists(atPath: url.path) { return }
+                            } catch ElevatedUninstallError.userCancelled {
+                                throw ElevatedUninstallError.userCancelled
+                            } catch {
+                                // fallback to admin rm
                             }
-                            try ElevatedUninstall.removeWithAdmin(url)
                         }
+                        try await ElevatedUninstall.removeWithAdmin(url)
                     },
                     logger: logger
                 )

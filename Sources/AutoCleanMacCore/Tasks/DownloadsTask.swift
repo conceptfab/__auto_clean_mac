@@ -24,7 +24,7 @@ public struct DownloadsTask: CleanupTask {
         }
 
         let now = Date()
-        let cutoff = now.addingTimeInterval(TimeInterval(-context.retentionDays * 86_400))
+        let cutoff = now.addingTimeInterval(-TimeInterval(context.retentionDays) * 86_400)
         var freed: Int64 = 0
         var itemsDeleted = 0
         var warnings: [String] = []

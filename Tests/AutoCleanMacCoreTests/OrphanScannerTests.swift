@@ -86,6 +86,62 @@ final class OrphanScannerTests: XCTestCase {
         XCTAssertTrue(orphans.isEmpty)
     }
 
+    func test_scan_ignores_non_bundle_id_and_shared_folders() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Orphan-\(UUID().uuidString)")
+        let lib = temp.appendingPathComponent("Library")
+        defer { try? FileManager.default.removeItem(at: temp) }
+        let names = [
+            "Application Support/MobileSync",
+            "Application Support/AddressBook",
+            "Application Support/CloudDocs",
+            "Application Support/Code",
+            "Application Support/Steam",
+            "Application Support/com.google.Keystone",
+            "Application Support/org.sparkle-project.Sparkle",
+            "Application Support/com.vendor",          // tylko jedna kropka
+            "Caches/pypoetry",
+            "Logs/Some Folder.with.dots",               // spacja — to nie bundle ID
+            "Application Support/com.dead.app",
+        ]
+        for name in names {
+            let dir = lib.appendingPathComponent(name)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try Data(repeating: 1, count: 10).write(to: dir.appendingPathComponent("data.bin"))
+            try makeOld(dir)
+        }
+        let prefs = lib.appendingPathComponent("Preferences")
+        try FileManager.default.createDirectory(at: prefs, withIntermediateDirectories: true)
+        let loginwindow = prefs.appendingPathComponent("loginwindow.plist")
+        try Data(repeating: 1, count: 10).write(to: loginwindow)
+        try makeOld(loginwindow)
+
+        let orphans = await OrphanScanner().scan(homeDirectory: temp, installedBundleIDs: [])
+
+        XCTAssertEqual(orphans.map(\.bundleID), ["com.dead.app"])
+    }
+
+    func test_scan_matches_installed_bundle_ids_case_insensitively() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Orphan-\(UUID().uuidString)")
+        let support = temp.appendingPathComponent("Library/Application Support/com.Vendor.App")
+        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        try makeOld(support)
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let orphans = await OrphanScanner().scan(homeDirectory: temp, installedBundleIDs: ["com.vendor.app"])
+
+        XCTAssertTrue(orphans.isEmpty)
+    }
+
+    func test_looks_like_bundle_identifier() {
+        XCTAssertTrue(OrphanScanner.looksLikeBundleIdentifier("com.dead.app"))
+        XCTAssertTrue(OrphanScanner.looksLikeBundleIdentifier("org.my-co.App_Helper"))
+        XCTAssertFalse(OrphanScanner.looksLikeBundleIdentifier("com.vendor"))
+        XCTAssertFalse(OrphanScanner.looksLikeBundleIdentifier("MobileSync"))
+        XCTAssertFalse(OrphanScanner.looksLikeBundleIdentifier("com..app"))
+        XCTAssertFalse(OrphanScanner.looksLikeBundleIdentifier("com.dead.app/.."))
+        XCTAssertFalse(OrphanScanner.looksLikeBundleIdentifier("a b.c.d"))
+    }
+
     private func makeOld(_ url: URL) throws {
         let oldDate = Date(timeIntervalSinceNow: -31 * 24 * 60 * 60)
         try FileManager.default.setAttributes([.modificationDate: oldDate], ofItemAtPath: url.path)

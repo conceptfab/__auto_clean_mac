@@ -6,6 +6,9 @@ public final class Logger: @unchecked Sendable {
     private let isoFormatter: ISO8601DateFormatter
     private let dayFormatter: DateFormatter
     private let queue = DispatchQueue(label: "autocleanmac.logger")
+    /// Otwarty uchwyt do pliku bieżącego dnia (dostęp wyłącznie na `queue`).
+    private var handle: FileHandle?
+    private var handleDay: String?
 
     public init(directory: URL, clock: @escaping @Sendable () -> Date = { Date() }) throws {
         self.directory = directory
@@ -28,20 +31,45 @@ public final class Logger: @unchecked Sendable {
             .joined(separator: " ")
         let line = "\(timestamp)\t\(event)\t\(fieldsString)\n"
         let file = directory.appendingPathComponent("\(day).log")
+        guard let data = line.data(using: .utf8) else { return }
         queue.sync {
-            if !FileManager.default.fileExists(atPath: file.path) {
-                FileManager.default.createFile(atPath: file.path, contents: nil)
-            }
             do {
-                let handle = try FileHandle(forWritingTo: file)
-                defer { try? handle.close() }
-                try handle.seekToEnd()
-                if let data = line.data(using: .utf8) {
-                    try handle.write(contentsOf: data)
-                }
+                try currentHandle(day: day, file: file).write(contentsOf: data)
             } catch {
-                NSLog("AutoCleanMac.Logger: write failed for \(file.path): \(error)")
+                // Uchwyt mógł się zepsuć (np. plik usunięty/odmontowany) — jedna próba z nowym.
+                closeHandle()
+                do {
+                    try currentHandle(day: day, file: file).write(contentsOf: data)
+                } catch {
+                    closeHandle()
+                    NSLog("AutoCleanMac.Logger: write failed for \(file.path): \(error)")
+                }
             }
         }
+    }
+
+    deinit {
+        try? handle?.close()
+    }
+
+    /// Wołać tylko na `queue`. Plik otwierany z `O_APPEND`, więc każdy zapis trafia na koniec
+    /// nawet gdy do tego samego logu pisze równolegle drugi proces (aplikacja + hub).
+    private func currentHandle(day: String, file: URL) throws -> FileHandle {
+        if let handle, handleDay == day { return handle }
+        closeHandle()
+        let fd = open(file.path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0o644)
+        guard fd >= 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [NSFilePathErrorKey: file.path])
+        }
+        let newHandle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        handle = newHandle
+        handleDay = day
+        return newHandle
+    }
+
+    private func closeHandle() {
+        try? handle?.close()
+        handle = nil
+        handleDay = nil
     }
 }

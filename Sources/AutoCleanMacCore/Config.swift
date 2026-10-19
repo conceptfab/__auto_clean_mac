@@ -153,7 +153,17 @@ public struct Config: Equatable {
             return .default
         }
         var config = Config.default
-        if let n = json["retention_days"] as? Int { config.retentionDays = n }
+        if let n = json["retention_days"] as? Int {
+            if n < Config.retentionDaysRange.lowerBound {
+                // 0/ujemna retencja oznaczałaby „usuń wszystko” — wracamy do bezpiecznego domyślnego.
+                warn("Nieprawidłowa wartość retention_days: \(n) — używam wartości domyślnej (\(config.retentionDays))")
+            } else if n > Config.retentionDaysRange.upperBound {
+                warn("Zbyt duża wartość retention_days: \(n) — ograniczam do \(Config.retentionDaysRange.upperBound)")
+                config.retentionDays = Config.retentionDaysRange.upperBound
+            } else {
+                config.retentionDays = n
+            }
+        }
         if let w = json["window"] as? [String: Any] {
             if let v = w["fade_in_ms"]    as? Int { config.window.fadeInMs    = v }
             if let v = w["hold_after_ms"] as? Int { config.window.holdAfterMs = v }
@@ -216,6 +226,13 @@ public struct Config: Equatable {
             config.excludedPaths = rawExcludedPaths
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
+                .filter { raw in
+                    guard Config.isSupportedExcludedPath(raw) else {
+                        warn("Pomijam wykluczoną ścieżkę \"\(raw)\" — musi być absolutna albo zaczynać się od ~/")
+                        return false
+                    }
+                    return true
+                }
         }
         if let rawWhitelisted = json["whitelisted_cache_apps"] as? [String] {
             config.whitelistedCacheApps = rawWhitelisted
@@ -228,8 +245,17 @@ public struct Config: Equatable {
         return config
     }
 
+    /// Dopuszczalny zakres `retention_days` (1 dzień … 10 lat).
+    public static let retentionDaysRange = 1...3650
+
+    /// Wykluczenie musi być ścieżką absolutną albo zaczynać się od `~/` (lub być samym `~`).
+    /// Ścieżka względna rozwiązywałaby się względem cwd procesu („/” dla LaunchAgenta).
+    public static func isSupportedExcludedPath(_ raw: String) -> Bool {
+        raw == "~" || raw.hasPrefix("~/") || raw.hasPrefix("/")
+    }
+
     public func resolvedExcludedPathURLs(homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) -> [URL] {
-        excludedPaths.map { raw in
+        excludedPaths.filter(Config.isSupportedExcludedPath).map { raw in
             let path: String
             if raw == "~" {
                 path = homeDirectory.path

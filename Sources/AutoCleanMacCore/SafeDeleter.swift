@@ -27,6 +27,8 @@ public final class SafeDeleter: Sendable {
 
     public enum DeletionError: Error, CustomStringConvertible, LocalizedError {
         case outsideAllowedRoot(path: String, root: String)
+        /// Odmowa usunięcia samego katalogu-korzenia (dozwolone są tylko elementy wewnątrz).
+        case refusedRoot(path: String)
         case excludedPath(path: String)
         case notFound(path: String)
         /// Thrown when the measure succeeded but the removal (removeItem/trashItem) failed.
@@ -37,6 +39,7 @@ public final class SafeDeleter: Sendable {
         public var description: String {
             switch self {
             case .outsideAllowedRoot(let p, let r): return "Path \(p) escapes root \(r)"
+            case .refusedRoot(let p):               return "Refusing to delete root itself: \(p)"
             case .excludedPath(let p):              return "Excluded path: \(p)"
             case .notFound(let p):                  return "Not found: \(p)"
             case .removalFailed(let p, _, let underlying): return "Removal failed for \(p): \(underlying)"
@@ -68,7 +71,11 @@ public final class SafeDeleter: Sendable {
         let pathStr = resolvedPath.path
         let rootWithSep = rootStr.hasSuffix("/") ? rootStr : rootStr + "/"
 
-        guard pathStr == rootStr || pathStr.hasPrefix(rootWithSep) else {
+        // Usuwać wolno tylko elementy WEWNĄTRZ korzenia — nigdy sam korzeń.
+        guard pathStr != rootStr, pathStr != "/" else {
+            throw DeletionError.refusedRoot(path: pathStr)
+        }
+        guard pathStr.hasPrefix(rootWithSep) else {
             throw DeletionError.outsideAllowedRoot(path: pathStr, root: rootStr)
         }
 
@@ -159,5 +166,13 @@ public extension URL {
         let selfStr = self.resolvingSymlinksInPath().standardizedFileURL.path
         let rootWithSep = rootStr.hasSuffix("/") ? rootStr : rootStr + "/"
         return selfStr == rootStr || selfStr.hasPrefix(rootWithSep)
+    }
+
+    /// Jak `isWithin`, ale sam `root` NIE się liczy — tylko ścisli potomkowie.
+    func isStrictlyWithin(_ root: URL) -> Bool {
+        let rootStr = root.resolvingSymlinksInPath().standardizedFileURL.path
+        let selfStr = self.resolvingSymlinksInPath().standardizedFileURL.path
+        let rootWithSep = rootStr.hasSuffix("/") ? rootStr : rootStr + "/"
+        return selfStr != rootStr && selfStr.hasPrefix(rootWithSep)
     }
 }

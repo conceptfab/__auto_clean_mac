@@ -29,7 +29,17 @@ public struct UserCachesTask: CleanupTask {
         var itemsDeleted = 0
         var warnings: [String] = []
         for candidateRoot in deletionRoots(in: root, context: context) {
-            for url in FileEnumerator.files(inRoot: candidateRoot, fileManager: context.fileManager) {
+            // Filtr wieku: pliki świeższe niż retencja mogą być w użyciu (aplikacje nie zawsze
+            // mają bundle-ID-ową nazwę katalogu, więc test „czy działa” nie wszystko łapie).
+            let files = FileEnumerator.files(
+                inRoot: candidateRoot,
+                olderThanDays: context.retentionDays,
+                fileManager: context.fileManager
+            )
+            for url in files {
+                if Self.isProtectedNested(url, cachesRoot: root) {
+                    continue
+                }
                 do {
                     let metrics = try context.deleteMeasured(url, withinRoot: candidateRoot)
                     freed += metrics.bytesFreed
@@ -105,6 +115,30 @@ public struct UserCachesTask: CleanupTask {
         return protectedPrefixes.contains { name.hasPrefix($0) }
     }
 
+    /// Pliki wewnątrz katalogów cache, które niosą stan (nie są odtwarzalnym cache) albo są
+    /// w trakcie zapisu — np. środowiska Poetry, pobierania Homebrew `*.incomplete`.
+    private static func isProtectedNested(_ url: URL, cachesRoot: URL) -> Bool {
+        if protectedFileSuffixes.contains(where: { url.lastPathComponent.hasSuffix($0) }) {
+            return true
+        }
+        let rootPath = cachesRoot.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        guard path.hasPrefix(rootPath + "/") else { return false }
+        let relative = String(path.dropFirst(rootPath.count + 1))
+        return protectedNestedPrefixes.contains { relative == $0 || relative.hasPrefix($0 + "/") }
+    }
+
+    private static let protectedNestedPrefixes: [String] = [
+        "pypoetry/virtualenvs",
+    ]
+
+    private static let protectedFileSuffixes: [String] = [
+        ".incomplete",   // Homebrew: pobieranie w toku
+        ".part",
+        ".partial",
+        ".download",
+    ]
+
     private static func isBrowserCacheVendor(_ name: String) -> Bool {
         browserCacheVendorNames.contains(name)
     }
@@ -130,6 +164,10 @@ public struct UserCachesTask: CleanupTask {
         "Microsoft Edge",
         "OneDrive",
         "Vivaldi",
+        // Stan, nie cache: pobrane przeglądarki/binarki narzędzi — usunięcie psuje narzędzie.
+        "ms-playwright",
+        "ms-playwright-go",
+        "Cypress",
     ]
 
     private static let protectedPrefixes: [String] = [
