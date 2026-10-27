@@ -63,8 +63,15 @@ public struct DevCachesTask: CleanupTask {
             }
         }
 
+        // Whole-cache commands cannot enforce individual path exclusions.
+        if !context.excludedPaths.isEmpty, runBrew || !nativeToolCommands.isEmpty {
+            context.logger.log(event: "dev_tool_cleanup_skip", fields: ["reason": "excluded_paths"])
+            warnings.append("Polecenia czyszczenia cache pominięte: skonfigurowano wykluczone ścieżki.")
+            return TaskResult(bytesFreed: freed, itemsDeleted: itemsDeleted, warnings: warnings)
+        }
+
         if runBrew, let brew = brewExecutable() {
-            guard context.deletionMode == .live else {
+            guard context.deletionMode == .live, context.deleter.mode == .live else {
                 let mode = Self.deletionModeLabel(context.deletionMode)
                 context.logger.log(event: "brew_cleanup_skip", fields: [
                     "path": brew,
@@ -116,7 +123,7 @@ public struct DevCachesTask: CleanupTask {
 
     private func runNativeToolCleanups(context: CleanupContext, warnings: inout [String]) {
         let mode = Self.deletionModeLabel(context.deletionMode)
-        guard context.deletionMode == .live else {
+        guard context.deletionMode == .live, context.deleter.mode == .live else {
             context.logger.log(event: "dev_tool_cleanup_skip", fields: [
                 "mode": mode,
                 "reason": "mode_not_live",

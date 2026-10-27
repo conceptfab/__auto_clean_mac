@@ -95,7 +95,8 @@ public struct BrowserDataTask: CleanupTask {
                 // Tylko `Preferences` — `Secure Preferences` jest chroniony MAC-iem (patrz scrubber).
                 for preferencesName in ["Preferences"] {
                     let preferencesURL = profile.appendingPathComponent(preferencesName)
-                    guard context.fileManager.fileExists(atPath: preferencesURL.path) else { continue }
+                    guard context.fileManager.fileExists(atPath: preferencesURL.path),
+                          !context.isExcluded(preferencesURL) else { continue }
                     do {
                         // Przepisanie JSON-a jest nieodwracalne (nie trafia do Kosza), więc robimy
                         // to wyłącznie w trybie live; w dry-run/trash tylko logujemy, co by się zmieniło.

@@ -235,6 +235,32 @@ final class AutoCleanControllerTests: XCTestCase {
         XCTAssertTrue(script.contains("quoted form of \"/Applications/Some \\\"App\\\".app\""))
     }
 
+    func test_failed_finder_trash_does_not_retry_with_permanent_removal() async {
+        var scripts: [String] = []
+        do {
+            try await ElevatedUninstall.remove(URL(fileURLWithPath: "/Applications/Test.app"), mode: .trash) { script in
+                scripts.append(script)
+                throw ElevatedUninstallError.scriptFailed(code: -1743, message: "Finder access denied")
+            }
+            XCTFail("Finder error must reach the caller")
+        } catch ElevatedUninstallError.scriptFailed(let code, _) {
+            XCTAssertEqual(code, -1743)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        XCTAssertEqual(scripts.count, 1)
+        XCTAssertTrue(scripts.first?.contains("tell application \"Finder\"") == true)
+        XCTAssertFalse(scripts.contains { $0.contains("rm -rf") })
+    }
+
+    func test_elevated_removal_respects_live_and_dry_run_modes() async throws {
+        let url = URL(fileURLWithPath: "/Applications/Test.app")
+        try await ElevatedUninstall.remove(url, mode: .dryRun) { _ in XCTFail("dry-run executed a script") }
+        var script: String?
+        try await ElevatedUninstall.remove(url, mode: .live) { script = $0 }
+        XCTAssertEqual(script, ElevatedUninstall.adminRemoveScript(for: url))
+    }
+
     func test_appleScriptErrorCode_parses_osascript_stderr() {
         XCTAssertEqual(ElevatedUninstall.appleScriptErrorCode(in: "0:94: execution error: User canceled. (-128)"), -128)
         XCTAssertEqual(ElevatedUninstall.appleScriptErrorCode(in: "0:10: execution error: rm: /x: Operation not permitted (1)"), 1)

@@ -485,18 +485,7 @@ public final class AutoCleanController {
                     loginItems: ShellLoginItemsClient(),
                     launchServices: launchServices,
                     elevatedRemove: { url in
-                        // Skrypty wykonują się w tle (osascript) — main thread huba pozostaje wolny.
-                        if mode == .trash {
-                            do {
-                                try await ElevatedUninstall.trashViaFinder(url)
-                                if !FileManager.default.fileExists(atPath: url.path) { return }
-                            } catch ElevatedUninstallError.userCancelled {
-                                throw ElevatedUninstallError.userCancelled
-                            } catch {
-                                // fallback to admin rm
-                            }
-                        }
-                        try await ElevatedUninstall.removeWithAdmin(url)
+                        try await ElevatedUninstall.remove(url, mode: mode)
                     },
                     logger: logger
                 )

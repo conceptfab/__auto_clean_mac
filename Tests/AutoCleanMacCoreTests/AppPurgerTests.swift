@@ -47,6 +47,72 @@ final class SpyLaunchServicesClient: LaunchServicesClient, @unchecked Sendable {
 }
 
 final class AppPurgerTests: XCTestCase {
+    func test_cancelled_app_removal_preserves_user_and_system_data() async throws {
+        try XCTSkipIf(getuid() == 0, "root bypasses directory permissions")
+        let fm = FileManager.default
+        let temp = try Fixtures.makeTempDir()
+        defer { try? fm.removeItem(at: temp) }
+        let app = temp.appendingPathComponent("Applications/Locked.app")
+        try fm.createDirectory(at: app, withIntermediateDirectories: true)
+        let paths = [
+            "Library/Preferences/com.example.Locked.plist",
+            "Library/Application Support/com.example.Locked/data",
+            "Library/LaunchAgents/com.example.Locked.worker.plist",
+            "system/Library/LaunchDaemons/com.example.Locked.worker.plist"
+        ].map { temp.appendingPathComponent($0) }
+        for path in paths { try Fixtures.makeFile(at: path, size: 100) }
+        try fm.setAttributes([.posixPermissions: 0o555], ofItemAtPath: app.deletingLastPathComponent().path)
+        defer { try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: app.deletingLastPathComponent().path) }
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        let prefs = SpyPreferencesDaemon()
+        let agents = SpyLaunchAgentClient()
+        let elevated = expectation(description: "Administrator removal was cancelled")
+        elevated.assertForOverFulfill = true
+        let outcome = await AppPurger(
+            deleter: SafeDeleter(mode: .live, logger: logger), prefsDaemon: prefs,
+            launchAgents: agents, terminator: SpyAppTerminator(), loginItems: SpyLoginItemsClient(),
+            launchServices: SpyLaunchServicesClient(), elevatedRemove: { _ in
+                elevated.fulfill()
+                throw NSError(domain: "UserCancelled", code: -128)
+            }, logger: logger
+        ).purge(bundleID: "com.example.Locked", displayName: nil, appURL: app,
+                homeDirectory: temp, systemRoot: temp.appendingPathComponent("system"), includeSystemPaths: true)
+
+        await fulfillment(of: [elevated], timeout: 1)
+        XCTAssertFalse(outcome.appRemoved)
+        XCTAssertFalse(outcome.failures.isEmpty)
+        XCTAssertTrue(fm.fileExists(atPath: app.path))
+        for path in paths { XCTAssertTrue(fm.fileExists(atPath: path.path), path.path) }
+        XCTAssertTrue(prefs.calls.isEmpty)
+        XCTAssertTrue(agents.calls.isEmpty)
+    }
+
+    func test_dryRun_preserves_loaded_user_and_system_services() async throws {
+        let fm = FileManager.default
+        let temp = try Fixtures.makeTempDir()
+        defer { try? fm.removeItem(at: temp) }
+        let app = temp.appendingPathComponent("Applications/Tiny.app")
+        try fm.createDirectory(at: app, withIntermediateDirectories: true)
+        let paths = ["Library/LaunchAgents/com.example.Tiny.worker.plist",
+                     "system/Library/LaunchDaemons/com.example.Tiny.worker.plist",
+                     "system/Library/LaunchAgents/com.example.Tiny.worker.plist"]
+            .map { temp.appendingPathComponent($0) }
+        for path in paths { try Fixtures.makeFile(at: path, size: 100) }
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        let agents = SpyLaunchAgentClient()
+        let outcome = await AppPurger(
+            deleter: SafeDeleter(mode: .dryRun, logger: logger), prefsDaemon: SpyPreferencesDaemon(),
+            launchAgents: agents, terminator: SpyAppTerminator(), loginItems: SpyLoginItemsClient(),
+            launchServices: SpyLaunchServicesClient(), elevatedRemove: { _ in XCTFail("dry-run elevated") },
+            logger: logger
+        ).purge(bundleID: "com.example.Tiny", displayName: nil, appURL: app,
+                homeDirectory: temp, systemRoot: temp.appendingPathComponent("system"), includeSystemPaths: true)
+
+        XCTAssertTrue(outcome.failures.isEmpty)
+        XCTAssertTrue(agents.calls.isEmpty)
+        for path in paths { XCTAssertTrue(fm.fileExists(atPath: path.path)) }
+    }
+
     func test_purge_removes_app_and_userside_leftovers_in_dryRun() async throws {
         let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("AppPurger-\(UUID().uuidString)")
         let appsDir = temp.appendingPathComponent("Applications")

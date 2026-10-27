@@ -410,6 +410,28 @@ final class TasksTests: XCTestCase {
         XCTAssertTrue(result.warnings.isEmpty)
     }
 
+    func test_dev_cache_commands_cannot_bypass_exclusions() async throws {
+        let excluded = tempDir.appendingPathComponent(".npm/_cacache/keep.bin")
+        let removable = tempDir.appendingPathComponent(".npm/_cacache/old.bin")
+        try Fixtures.makeFile(at: excluded, size: 100, ageInDays: 30)
+        try Fixtures.makeFile(at: removable, size: 200, ageInDays: 30)
+        let task = DevCachesTask(
+            isEnabled: true, runBrew: true, brewExecutable: { "/mock/brew" },
+            toolExecutable: { _ in "/mock/npm" }, runBrewProcess: { _, _, _ in
+                XCTFail("Whole-cache commands must not run with exclusions")
+                return .init(status: 0, stdout: "", stderr: "", timedOut: false)
+            }, nativeToolCommands: [.init(label: "npm cache", executableName: "npm", arguments: ["cache", "clean", "--force"])]
+        )
+        let context = CleanupContext(retentionDays: 7, deleter: deleter, logger: logger,
+                                     homeDirectory: tempDir, excludedPaths: [excluded])
+        let result = await task.run(context: context)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: excluded.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: removable.path))
+        XCTAssertEqual(result.bytesFreed, 200)
+        XCTAssertTrue(result.warnings.contains { $0.contains("wykluczone ścieżki") })
+    }
+
     func test_dev_caches_warns_when_native_tool_is_missing() async throws {
         var didRun = false
         let task = DevCachesTask(
@@ -535,6 +557,23 @@ final class TasksTests: XCTestCase {
         XCTAssertEqual(result.bytesFreed, 0)
         XCTAssertTrue(result.warnings.contains { $0.contains("excluded path") })
         XCTAssertTrue(FileManager.default.fileExists(atPath: cache.appendingPathComponent("chunk.bin").path))
+    }
+
+    func test_project_artifacts_preserves_excluded_file_inside_deleted_directory() async throws {
+        let projects = tempDir.appendingPathComponent("Projects")
+        let excluded = projects.appendingPathComponent("App/.pytest_cache/keep.txt")
+        let otherCache = projects.appendingPathComponent("App/.mypy_cache/old.bin")
+        try Fixtures.makeFile(at: excluded, size: 100)
+        try Fixtures.makeFile(at: otherCache, size: 200)
+        let context = CleanupContext(retentionDays: 7, deleter: deleter, logger: logger,
+                                     homeDirectory: tempDir, excludedPaths: [excluded])
+
+        let result = await ProjectArtifactsTask(isEnabled: true, searchRoots: [projects]).run(context: context)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: excluded.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: otherCache.path))
+        XCTAssertEqual(result.bytesFreed, 200)
+        XCTAssertEqual(result.warnings.count, 1)
     }
 
     func test_project_artifacts_does_not_follow_symlinked_roots_or_candidates_outside_root() async throws {

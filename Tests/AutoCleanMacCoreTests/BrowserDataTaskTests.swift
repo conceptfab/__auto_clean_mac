@@ -284,6 +284,21 @@ final class BrowserDataTaskTests: XCTestCase {
         }
     }
 
+    func test_chrome_history_preserves_excluded_preferences_and_profiles() async throws {
+        let profile = tempDir.appendingPathComponent("Library/Application Support/Google/Chrome/Default")
+        let preferences = profile.appendingPathComponent("Preferences")
+        try FileManager.default.createDirectory(at: profile, withIntermediateDirectories: true)
+        let original = Data(#"{"sessions":{"last":"keep"},"profile":{"exit_type":"Crashed"}}"#.utf8)
+        for excluded in [preferences, profile] {
+            try original.write(to: preferences)
+            let ctx = CleanupContext(retentionDays: 7, deleter: SafeDeleter(mode: .live, logger: logger),
+                                     logger: logger, homeDirectory: tempDir, excludedPaths: [excluded])
+            _ = await BrowserDataTask(browser: .chrome, dataType: .history, isEnabled: true,
+                                      isBrowserRunning: { _ in false }).run(context: ctx)
+            XCTAssertEqual(try Data(contentsOf: preferences), original)
+        }
+    }
+
     func test_chrome_history_also_deletes_session_restore_files() async throws {
         let profile = tempDir.appendingPathComponent("Library/Application Support/Google/Chrome/Default")
         try Fixtures.makeFile(at: profile.appendingPathComponent("Current Session"), size: 100)

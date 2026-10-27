@@ -1,4 +1,5 @@
 import Foundation
+import AutoCleanMacCore
 
 enum ElevatedUninstallError: Error, CustomStringConvertible {
     case scriptCompileFailed
@@ -18,21 +19,26 @@ enum ElevatedUninstallError: Error, CustomStringConvertible {
 /// na main thread. Okno hasła administratora i samo `rm -rf` potrafią trwać minutami, a moduł
 /// działa wewnątrz jednego procesu menu-bar („CFAB Control”) — blokada main threadu zamroziłaby cały hub.
 enum ElevatedUninstall {
-    /// Przenosi element do Kosza przez Finder. macOS sam pokaże prompt o hasło, jeśli trzeba.
-    static func trashViaFinder(_ url: URL) async throws {
-        let escaped = escapeForAppleScript(url.path)
-        let source = """
-        tell application "Finder"
-            delete POSIX file "\(escaped)"
-        end tell
-        """
-        try await runScript(source)
-    }
-
-    /// Trwale usuwa element z autoryzacją administratora. macOS pokazuje standardowe okno hasła.
-    /// Autoryzacja jest cache'owana ~5 minut, więc seria deinstalacji = jeden prompt.
-    static func removeWithAdmin(_ url: URL) async throws {
-        try await runScript(adminRemoveScript(for: url))
+    static func remove(
+        _ url: URL,
+        mode: SafeDeleter.Mode,
+        run: (String) async throws -> Void = runScript
+    ) async throws {
+        let source: String
+        switch mode {
+        case .dryRun:
+            return
+        case .trash:
+            let escaped = escapeForAppleScript(url.path)
+            source = """
+            tell application "Finder"
+                delete POSIX file "\(escaped)"
+            end tell
+            """
+        case .live:
+            source = adminRemoveScript(for: url)
+        }
+        try await run(source)
     }
 
     /// AppleScript usuwający element z autoryzacją administratora: macOS pokazuje własne okno

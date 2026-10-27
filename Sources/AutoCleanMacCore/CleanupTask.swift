@@ -62,7 +62,10 @@ public struct CleanupContext {
 
     @discardableResult
     public func deleteMeasured(_ url: URL, withinRoot root: URL) throws -> SafeDeleter.DeletionMetrics {
-        if isExcluded(url) {
+        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+        let prefix = path.hasSuffix("/") ? path : path + "/"
+        // A recursive removal must also preserve exclusions inside the target directory.
+        if isExcluded(url) || excludedPaths.contains(where: { $0.path.hasPrefix(prefix) }) {
             throw SafeDeleter.DeletionError.excludedPath(path: url.path)
         }
         return try deleter.deleteMeasured(url, withinRoot: root)

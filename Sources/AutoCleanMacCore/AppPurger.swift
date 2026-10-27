@@ -130,13 +130,19 @@ public final class AppPurger: Sendable {
             }
         }
 
+        if !appRemoved, fm.fileExists(atPath: appURL.path) {
+            logger.log(event: "purge_aborted", fields: ["bundle": bundleID, "reason": "app_removal_failed"])
+            return PurgeOutcome(appRemoved: false, bytesFreed: bytes, itemsDeleted: items,
+                                elevatedFallbackUsed: elevatedUsed, failures: failures)
+        }
+
         // Leftovers user-side — usuwane nawet jeśli .app już nie istniała (czyścimy resztki).
         let userLib = homeDirectory.appendingPathComponent("Library")
         let userLeftovers = LeftoverPathProvider.userPaths(bundleID: bundleID, displayName: displayName, homeDirectory: homeDirectory)
             + LeftoverPathProvider.resolveDynamic(bundleID: bundleID, homeDirectory: homeDirectory)
         for url in userLeftovers where fm.fileExists(atPath: url.path) {
             // Unload LaunchAgents zanim usuniemy plist.
-            if url.isWithin(userLib.appendingPathComponent("LaunchAgents")) {
+            if deleter.mode != .dryRun, url.isWithin(userLib.appendingPathComponent("LaunchAgents")) {
                 _ = launchAgents.unload(plist: url, domain: .userGUI(uid: getuid()))
             }
             do {
@@ -162,7 +168,8 @@ public final class AppPurger: Sendable {
                     failures.append(PurgeFailure(path: url.path, reason: "Ścieżka poza dozwolonym katalogiem — pominięto."))
                     continue
                 }
-                if url.isWithin(systemLib.appendingPathComponent("LaunchDaemons"))
+                if deleter.mode != .dryRun,
+                   url.isWithin(systemLib.appendingPathComponent("LaunchDaemons"))
                     || url.isWithin(systemLib.appendingPathComponent("LaunchAgents")) {
                     _ = launchAgents.unload(plist: url, domain: .system)
                 }
