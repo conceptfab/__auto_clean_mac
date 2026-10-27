@@ -4,7 +4,7 @@ import AutoCleanMacCore
 // MARK: - Components
 
 struct DeleteModeRow: View {
-    let mode: DeleteMode
+    let mode: SafeDeleter.Mode
     let selected: Bool
     let onSelect: () -> Void
 
@@ -144,8 +144,8 @@ struct AppIconHero: View {
 
 // MARK: - Helpers
 
-extension DeleteMode {
-    static var allCasesOrdered: [DeleteMode] { [.trash, .live, .dryRun] }
+extension SafeDeleter.Mode {
+    static var allCasesOrdered: [SafeDeleter.Mode] { [.trash, .live, .dryRun] }
 
     var title: String {
         switch self {
@@ -158,7 +158,7 @@ extension DeleteMode {
     var summary: String {
         switch self {
         case .trash:
-            return "Pliki trafiają do ~/.Trash. To najbezpieczniejszy tryb codziennego użycia."
+            return "Pliki trafiają do ~/.Trash. Zadanie „Kosz” usuwa na stałe elementy, które leżą w Koszu dłużej niż okres przechowywania. To najbezpieczniejszy tryb codziennego użycia."
         case .live:
             return "Usuwa natychmiast i bez możliwości odzyskania. Używaj tylko świadomie."
         case .dryRun:

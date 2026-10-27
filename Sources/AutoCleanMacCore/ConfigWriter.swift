@@ -42,7 +42,7 @@ public enum ConfigWriter {
             browsers[browser.rawValue] = entry
         }
 
-        let deleteModeJson = config.deleteMode.jsonValue
+        let deleteModeJson = config.deleteMode.label
 
         let reminderModeJson: String
         switch config.reminder.mode {

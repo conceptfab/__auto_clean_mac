@@ -25,6 +25,7 @@ public final class AppPurger: Sendable {
     private let loginItems: LoginItemsClient
     private let launchServices: LaunchServicesClient
     private let elevatedRemove: @Sendable (URL) async throws -> Void
+    private let excludedPaths: [URL]
     private let logger: Logger
 
     public init(
@@ -35,6 +36,7 @@ public final class AppPurger: Sendable {
         loginItems: LoginItemsClient,
         launchServices: LaunchServicesClient,
         elevatedRemove: @escaping @Sendable (URL) async throws -> Void,
+        excludedPaths: [URL] = [],
         logger: Logger
     ) {
         self.deleter = deleter
@@ -44,6 +46,7 @@ public final class AppPurger: Sendable {
         self.loginItems = loginItems
         self.launchServices = launchServices
         self.elevatedRemove = elevatedRemove
+        self.excludedPaths = excludedPaths
         self.logger = logger
     }
 
@@ -70,10 +73,7 @@ public final class AppPurger: Sendable {
         // Best-effort process termination before deletion. macOS allows deleting a
         // running bundle, so we never abort on terminator failure.
         if deleter.mode != .dryRun {
-            _ = await terminator.terminate(bundleID: bundleID, executableName: nil)
-        }
-        if deleter.mode != .dryRun {
-            loginItems.removeLoginItem(appName: displayName, bundleID: bundleID)
+            _ = await terminator.terminate(bundleID: bundleID)
         }
         if deleter.mode != .dryRun, appURL.pathExtension == "app" {
             launchServices.unregister(app: appURL)
@@ -136,6 +136,11 @@ public final class AppPurger: Sendable {
                                 elevatedFallbackUsed: elevatedUsed, failures: failures)
         }
 
+        // Dopiero po punkcie przerwania — anulowane okno hasła nie może zabrać Login Itemu.
+        if deleter.mode != .dryRun {
+            loginItems.removeLoginItem(appName: displayName, bundleID: bundleID)
+        }
+
         // Leftovers user-side — usuwane nawet jeśli .app już nie istniała (czyścimy resztki).
         let userLib = homeDirectory.appendingPathComponent("Library")
         let userLeftovers = LeftoverPathProvider.userPaths(bundleID: bundleID, displayName: displayName, homeDirectory: homeDirectory)
@@ -146,7 +151,7 @@ public final class AppPurger: Sendable {
                 _ = launchAgents.unload(plist: url, domain: .userGUI(uid: getuid()))
             }
             do {
-                let metrics = try deleter.deleteMeasured(url, withinRoot: userLib)
+                let metrics = try deleter.deleteMeasured(url, withinRoot: userLib, excluding: excludedPaths)
                 bytes += metrics.bytesFreed
                 items += metrics.itemsDeleted
             } catch {
@@ -167,11 +172,6 @@ public final class AppPurger: Sendable {
                     logger.log(event: "purge_system_refused", fields: ["path": url.path, "reason": "outside_allowed_root"])
                     failures.append(PurgeFailure(path: url.path, reason: "Ścieżka poza dozwolonym katalogiem — pominięto."))
                     continue
-                }
-                if deleter.mode != .dryRun,
-                   url.isWithin(systemLib.appendingPathComponent("LaunchDaemons"))
-                    || url.isWithin(systemLib.appendingPathComponent("LaunchAgents")) {
-                    _ = launchAgents.unload(plist: url, domain: .system)
                 }
                 let measured = (try? SafeDeleter.recursiveMetrics(at: url).bytesFreed) ?? 0
                 if deleter.mode == .dryRun {

@@ -27,7 +27,7 @@ public struct ShellLaunchAgentClient: LaunchAgentClient {
         do {
             try process.run()
             process.waitUntilExit()
-            return true
+            return process.terminationStatus == 0
         } catch {
             return false
         }

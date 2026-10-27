@@ -37,11 +37,14 @@ public struct TrashTask: CleanupTask {
         var freed: Int64 = 0
         var itemsDeleted = 0
         var warnings: [String] = []
+        // Elementy już są w Koszu — „przeniesienie do Kosza” nic by nie zwolniło, więc w trybie
+        // trash usuwamy trwale (dry-run nadal nic nie rusza). Te same bramki SafeDeleter i wykluczenia.
+        let deleter = context.deleter.mode == .trash ? SafeDeleter(mode: .live, logger: context.logger) : context.deleter
         for url in entries {
             // Brak daty = nie wiemy, kiedy element trafił do Kosza → zostawiamy.
             guard let trashed = trashedDate(url), trashed <= cutoff else { continue }
             do {
-                let metrics = try context.deleteMeasured(url, withinRoot: root)
+                let metrics = try deleter.deleteMeasured(url, withinRoot: root, excluding: context.excludedPaths)
                 freed += metrics.bytesFreed
                 itemsDeleted += metrics.itemsDeleted
             } catch {

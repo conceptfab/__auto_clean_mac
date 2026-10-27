@@ -181,12 +181,7 @@ public struct ProjectArtifactsTask: CleanupTask {
     }
 
     private func containingSearchRoot(for candidate: URL, roots: [URL]) -> URL? {
-        let candidatePath = candidate.resolvingSymlinksInPath().standardizedFileURL.path
-        return roots.first { root in
-            let rootPath = root.resolvingSymlinksInPath().standardizedFileURL.path
-            let rootWithSep = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
-            return candidatePath == rootPath || candidatePath.hasPrefix(rootWithSep)
-        }
+        roots.first { candidate.isWithin($0) }
     }
 
     private func depth(of url: URL) -> Int {

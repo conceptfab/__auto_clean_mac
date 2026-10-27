@@ -22,6 +22,22 @@ final class OrphanScannerTests: XCTestCase {
         XCTAssertEqual(orphans.first?.totalBytes, 200)
     }
 
+    func test_scan_treats_bundleID_suffixed_files_of_installed_app_as_installed() async throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Orphan-\(UUID().uuidString)")
+        let prefs = temp.appendingPathComponent("Library/Preferences")
+        try FileManager.default.createDirectory(at: prefs, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+        for name in ["com.alive.app.autoclean.plist", "com.alive.application.plist"] {
+            let url = prefs.appendingPathComponent(name)
+            try Data(repeating: 1, count: 10).write(to: url)
+            try makeOld(url)
+        }
+
+        let orphans = await OrphanScanner().scan(homeDirectory: temp, installedBundleIDs: ["com.alive.app"])
+        // Granica na kropce: `com.alive.application` to inna aplikacja — nadal sierota.
+        XCTAssertEqual(orphans.map(\.bundleID), ["com.alive.application"])
+    }
+
     func test_scan_groups_multiple_paths_for_same_bundle_id() async throws {
         let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Orphan-\(UUID().uuidString)")
         let prefs = temp.appendingPathComponent("Library/Preferences")

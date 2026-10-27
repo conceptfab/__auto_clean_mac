@@ -33,7 +33,6 @@ final class ScannerViewModel: ObservableObject {
         let ctx = CleanupContext(
             retentionDays: config.retentionDays,
             deleter: deleter,
-            deletionMode: .dryRun,
             logger: logger,
             excludedPaths: config.resolvedExcludedPathURLs()
         )

@@ -240,17 +240,11 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue (config.browsers[.firefox, default: .none].contains(.cache))
     }
 
-    func test_deleteMode_maps_to_safeDeleterMode() {
-        XCTAssertEqual(DeleteMode.trash.safeDeleterMode, .trash)
-        XCTAssertEqual(DeleteMode.live.safeDeleterMode, .live)
-        XCTAssertEqual(DeleteMode.dryRun.safeDeleterMode, .dryRun)
-    }
-
-    func test_deleteMode_jsonValue_roundtrips_through_parse() {
-        for mode in [DeleteMode.trash, .live, .dryRun] {
-            XCTAssertEqual(DeleteMode.parse(mode.jsonValue), mode)
+    func test_deleteMode_label_roundtrips_through_parse() {
+        for mode in [SafeDeleter.Mode.trash, .live, .dryRun] {
+            XCTAssertEqual(SafeDeleter.Mode.parse(mode.label), mode)
         }
-        XCTAssertEqual(DeleteMode.dryRun.jsonValue, "dry_run")
+        XCTAssertNil(SafeDeleter.Mode.parse("dryRun"))
     }
 
     func test_safeDeleterMode_label_matches_json() {

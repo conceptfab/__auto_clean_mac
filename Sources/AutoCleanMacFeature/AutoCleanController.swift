@@ -156,14 +156,13 @@ public final class AutoCleanController {
         let mode: SafeDeleter.Mode = {
             if let forcedMode { return forcedMode }
             if ProcessInfo.processInfo.environment["AUTOCLEANMAC_DRY_RUN"] != nil { return .dryRun }
-            return effectiveConfig.deleteMode.safeDeleterMode
+            return effectiveConfig.deleteMode
         }()
         logger.log(event: "mode", fields: ["mode": mode.label])
         let deleter = SafeDeleter(mode: mode, logger: logger)
         let ctx = CleanupContext(
             retentionDays: effectiveConfig.retentionDays,
             deleter: deleter,
-            deletionMode: mode,
             logger: logger,
             excludedPaths: effectiveConfig.resolvedExcludedPathURLs()
         )
@@ -487,6 +486,7 @@ public final class AutoCleanController {
                     elevatedRemove: { url in
                         try await ElevatedUninstall.remove(url, mode: mode)
                     },
+                    excludedPaths: self.config.resolvedExcludedPathURLs(),
                     logger: logger
                 )
 
@@ -534,7 +534,7 @@ public final class AutoCleanController {
                 }.value
             },
             onRemoveOrphans: { [weak self] groups, mode in
-                guard let logger = self?.logger else {
+                guard let logger = self?.logger, let excluded = self?.config.resolvedExcludedPathURLs() else {
                     return UninstallOutcome(freedBytes: 0, succeeded: 0, failures: [])
                 }
                 // `detached` is required: the enclosing closure is @MainActor-isolated, so a
@@ -550,7 +550,7 @@ public final class AutoCleanController {
                         var groupOk = true
                         for path in group.paths where FileManager.default.fileExists(atPath: path.url.path) {
                             do {
-                                let metrics = try deleter.deleteMeasured(path.url, withinRoot: userLib)
+                                let metrics = try deleter.deleteMeasured(path.url, withinRoot: userLib, excluding: excluded)
                                 freed += metrics.bytesFreed
                             } catch {
                                 groupOk = false

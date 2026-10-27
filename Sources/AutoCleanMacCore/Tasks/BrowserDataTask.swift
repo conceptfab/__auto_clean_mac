@@ -91,33 +91,31 @@ public struct BrowserDataTask: CleanupTask {
         }
         
         for profile in profilesToClean {
-            if browser.isChromium && dataType == .history {
-                // Tylko `Preferences` — `Secure Preferences` jest chroniony MAC-iem (patrz scrubber).
-                for preferencesName in ["Preferences"] {
-                    let preferencesURL = profile.appendingPathComponent(preferencesName)
-                    guard context.fileManager.fileExists(atPath: preferencesURL.path),
-                          !context.isExcluded(preferencesURL) else { continue }
-                    do {
-                        // Przepisanie JSON-a jest nieodwracalne (nie trafia do Kosza), więc robimy
-                        // to wyłącznie w trybie live; w dry-run/trash tylko logujemy, co by się zmieniło.
-                        let isLive = context.deletionMode == .live && context.deleter.mode == .live
-                        let changed = try ChromiumPreferencesScrubber.scrubSessionRestoreData(
-                            at: preferencesURL,
-                            fileManager: context.fileManager,
-                            write: isLive
-                        )
-                        if changed {
-                            context.logger.log(event: isLive ? "prefs_scrubbed" : "prefs_would_change", fields: [
-                                "path": preferencesURL.path,
-                                "mode": context.deletionMode.label,
-                            ])
-                        }
-                    } catch {
-                        if Self.isPermissionError(error) {
-                            warnings.append("\(browser.displayName): brak dostępu do \(preferencesName) — nadaj aplikacji Pełny dostęp do dysku (Full Disk Access) w Ustawieniach systemowych › Prywatność i bezpieczeństwo")
-                        } else {
-                            warnings.append("\(preferencesName): \(error)")
-                        }
+            // Tylko `Preferences` — `Secure Preferences` jest chroniony MAC-iem (patrz scrubber).
+            let preferencesURL = profile.appendingPathComponent("Preferences")
+            if browser.isChromium && dataType == .history,
+               context.fileManager.fileExists(atPath: preferencesURL.path),
+               !context.isExcluded(preferencesURL) {
+                do {
+                    // Przepisanie JSON-a jest nieodwracalne (nie trafia do Kosza), więc robimy
+                    // to wyłącznie w trybie live; w dry-run/trash tylko logujemy, co by się zmieniło.
+                    let isLive = context.deleter.mode == .live
+                    let changed = try ChromiumPreferencesScrubber.scrubSessionRestoreData(
+                        at: preferencesURL,
+                        fileManager: context.fileManager,
+                        write: isLive
+                    )
+                    if changed {
+                        context.logger.log(event: isLive ? "prefs_scrubbed" : "prefs_would_change", fields: [
+                            "path": preferencesURL.path,
+                            "mode": context.deleter.mode.label,
+                        ])
+                    }
+                } catch {
+                    if Self.isPermissionError(error) {
+                        warnings.append("\(browser.displayName): brak dostępu do Preferences — nadaj aplikacji Pełny dostęp do dysku (Full Disk Access) w Ustawieniach systemowych › Prywatność i bezpieczeństwo")
+                    } else {
+                        warnings.append("Preferences: \(error)")
                     }
                 }
             }

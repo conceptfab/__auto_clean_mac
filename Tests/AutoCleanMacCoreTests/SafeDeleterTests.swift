@@ -21,7 +21,7 @@ final class SafeDeleterTests: XCTestCase {
         let file = root.appendingPathComponent("a.txt")
         try Fixtures.makeFile(at: file, size: 100)
         let deleter = SafeDeleter(mode: .live, logger: logger)
-        let freed = try deleter.delete(file, withinRoot: root)
+        let freed = try deleter.deleteMeasured(file, withinRoot: root).bytesFreed
         XCTAssertEqual(freed, 100)
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
     }
@@ -32,7 +32,7 @@ final class SafeDeleterTests: XCTestCase {
         let outside = tempDir.appendingPathComponent("other/file.txt")
         try Fixtures.makeFile(at: outside)
         let deleter = SafeDeleter(mode: .live, logger: logger)
-        XCTAssertThrowsError(try deleter.delete(outside, withinRoot: root)) { error in
+        XCTAssertThrowsError(try deleter.deleteMeasured(outside, withinRoot: root)) { error in
             guard case SafeDeleter.DeletionError.outsideAllowedRoot = error else {
                 return XCTFail("Wrong error: \(error)")
             }
@@ -48,7 +48,7 @@ final class SafeDeleterTests: XCTestCase {
         let link = root.appendingPathComponent("trap")
         try Fixtures.makeSymlink(at: link, pointingTo: outside)
         let deleter = SafeDeleter(mode: .live, logger: logger)
-        XCTAssertThrowsError(try deleter.delete(link, withinRoot: root)) { error in
+        XCTAssertThrowsError(try deleter.deleteMeasured(link, withinRoot: root)) { error in
             guard case SafeDeleter.DeletionError.outsideAllowedRoot = error else {
                 return XCTFail("Wrong error: \(error)")
             }
@@ -61,7 +61,7 @@ final class SafeDeleterTests: XCTestCase {
         let file = root.appendingPathComponent("a.txt")
         try Fixtures.makeFile(at: file, size: 42)
         let deleter = SafeDeleter(mode: .dryRun, logger: logger)
-        let freed = try deleter.delete(file, withinRoot: root)
+        let freed = try deleter.deleteMeasured(file, withinRoot: root).bytesFreed
         XCTAssertEqual(freed, 42)
         XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
     }
@@ -71,7 +71,7 @@ final class SafeDeleterTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let file = root.appendingPathComponent("gone.txt")
         let deleter = SafeDeleter(mode: .live, logger: logger)
-        XCTAssertThrowsError(try deleter.delete(file, withinRoot: root))
+        XCTAssertThrowsError(try deleter.deleteMeasured(file, withinRoot: root))
     }
 
     func test_delete_directory_returns_recursive_size() throws {
@@ -81,7 +81,7 @@ final class SafeDeleterTests: XCTestCase {
         try Fixtures.makeFile(at: dir.appendingPathComponent("sub/b.bin"), size: 2_500)
         try Fixtures.makeFile(at: dir.appendingPathComponent("sub/deeper/c.bin"), size: 500)
         let deleter = SafeDeleter(mode: .live, logger: logger)
-        let freed = try deleter.delete(dir, withinRoot: root)
+        let freed = try deleter.deleteMeasured(dir, withinRoot: root).bytesFreed
         XCTAssertEqual(freed, 4_000)
         XCTAssertFalse(FileManager.default.fileExists(atPath: dir.path))
     }
@@ -92,7 +92,7 @@ final class SafeDeleterTests: XCTestCase {
         try Fixtures.makeFile(at: dir.appendingPathComponent("x.bin"), size: 300)
         try Fixtures.makeFile(at: dir.appendingPathComponent("y.bin"), size: 700)
         let deleter = SafeDeleter(mode: .dryRun, logger: logger)
-        let freed = try deleter.delete(dir, withinRoot: root)
+        let freed = try deleter.deleteMeasured(dir, withinRoot: root).bytesFreed
         XCTAssertEqual(freed, 1_000)
         XCTAssertTrue(FileManager.default.fileExists(atPath: dir.path))
     }
@@ -104,7 +104,7 @@ final class SafeDeleterTests: XCTestCase {
         try Fixtures.makeFile(at: dir.appendingPathComponent(".DS_Store"), size: 300)
         try Fixtures.makeFile(at: dir.appendingPathComponent(".hidden/blob.bin"), size: 500)
         let deleter = SafeDeleter(mode: .dryRun, logger: logger)
-        let freed = try deleter.delete(dir, withinRoot: root)
+        let freed = try deleter.deleteMeasured(dir, withinRoot: root).bytesFreed
         XCTAssertEqual(freed, 1_000)
     }
 
@@ -113,7 +113,7 @@ final class SafeDeleterTests: XCTestCase {
         let file = root.appendingPathComponent("doomed.txt")
         try Fixtures.makeFile(at: file, size: 128)
         let deleter = SafeDeleter(mode: .trash, logger: logger)
-        let freed = try deleter.delete(file, withinRoot: root)
+        let freed = try deleter.deleteMeasured(file, withinRoot: root).bytesFreed
         XCTAssertEqual(freed, 128)
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
     }
@@ -124,7 +124,7 @@ final class SafeDeleterTests: XCTestCase {
         let outside = tempDir.appendingPathComponent("safe.txt")
         try Fixtures.makeFile(at: outside)
         let deleter = SafeDeleter(mode: .trash, logger: logger)
-        XCTAssertThrowsError(try deleter.delete(outside, withinRoot: root)) { error in
+        XCTAssertThrowsError(try deleter.deleteMeasured(outside, withinRoot: root)) { error in
             guard case SafeDeleter.DeletionError.outsideAllowedRoot = error else {
                 return XCTFail("Wrong error: \(error)")
             }
@@ -139,7 +139,7 @@ final class SafeDeleterTests: XCTestCase {
         try Fixtures.makeFile(at: dir.appendingPathComponent("sub/b.bin"), size: 2_500)
         try Fixtures.makeFile(at: dir.appendingPathComponent(".hidden.bin"), size: 500)
         let deleter = SafeDeleter(mode: .trash, logger: logger)
-        let freed = try deleter.delete(dir, withinRoot: root)
+        let freed = try deleter.deleteMeasured(dir, withinRoot: root).bytesFreed
         XCTAssertEqual(freed, 4_000)
         XCTAssertFalse(FileManager.default.fileExists(atPath: dir.path))
     }
@@ -223,7 +223,7 @@ final class SafeDeleterTests: XCTestCase {
         try Fixtures.makeFile(at: root.appendingPathComponent("keep.txt"), size: 10)
         let deleter = SafeDeleter(mode: .live, logger: logger)
         for target in [root, root.appendingPathComponent("."), root.appendingPathComponent("sub/..")] {
-            XCTAssertThrowsError(try deleter.delete(target, withinRoot: root)) { error in
+            XCTAssertThrowsError(try deleter.deleteMeasured(target, withinRoot: root)) { error in
                 guard case SafeDeleter.DeletionError.refusedRoot = error else {
                     return XCTFail("expected refusedRoot, got \(error)")
                 }

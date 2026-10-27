@@ -9,7 +9,7 @@ public protocol AppTerminator: Sendable {
     /// Próbuje zamknąć aplikację. Sukces oznacza, że proces nie żyje po wywołaniu;
     /// zwrócenie `false` oznacza, że proces *może* nadal żyć (uninstall powinien iść dalej —
     /// macOS pozwala usunąć działający bundle).
-    func terminate(bundleID: String, executableName: String?) async -> Bool
+    func terminate(bundleID: String) async -> Bool
 }
 
 /// Minimalny interfejs uruchomionej aplikacji (testowalny zamiennik `NSRunningApplication`).
@@ -63,9 +63,9 @@ public struct ShellAppTerminator: AppTerminator {
         self.pollInterval = pollInterval
     }
 
-    /// `executableName` jest ignorowane — identyfikujemy procesy wyłącznie po bundle ID
-    /// (dopasowanie po nazwie procesu mogłoby trafić w obcy proces).
-    public func terminate(bundleID: String, executableName: String?) async -> Bool {
+    /// Identyfikujemy procesy wyłącznie po bundle ID (dopasowanie po nazwie procesu mogłoby
+    /// trafić w obcy proces).
+    public func terminate(bundleID: String) async -> Bool {
         guard !bundleID.isEmpty else { return true }
         let apps = runningApps(bundleID).filter { !$0.hasExited }
         guard !apps.isEmpty else { return true }

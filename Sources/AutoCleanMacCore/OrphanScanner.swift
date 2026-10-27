@@ -156,8 +156,8 @@ public struct OrphanScanner: Sendable {
         let fm = FileManager.default
         guard let entries = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
         for name in entries where name.hasSuffix(suffix) {
-            let stem = String(name.dropLast(suffix.count))
-            let bundleID = bundleIDFromPlistStem(stem)
+            // ByHost `<bundleID>.<UUID>` zostaje całością — takie sieroty trafiają do osobnych grup.
+            let bundleID = String(name.dropLast(suffix.count))
             guard isCandidateOrphan(bundleID: bundleID, installed: installed) else { continue }
             let url = dir.appendingPathComponent(name)
             guard isOldEnough(url) else { continue }
@@ -182,12 +182,6 @@ public struct OrphanScanner: Sendable {
         }
     }
 
-    private func bundleIDFromPlistStem(_ stem: String) -> String {
-        // Dla ByHost trzymamy się `<bundleID>.<UUID>` — odetnij ostatnią kropkę-UUID jeśli wygląda jak GUID/MAC.
-        // Tu uproszczenie: zwracamy całość, sieroty ByHost trafiają do osobnych grup, co jest OK.
-        return stem
-    }
-
     private func isCandidateOrphan(bundleID: String, installed: Set<String>) -> Bool {
         guard !bundleID.isEmpty, !bundleID.hasPrefix(".") else { return false }
         for prefix in Self.skippedPrefixes where bundleID.hasPrefix(prefix) { return false }
@@ -195,7 +189,8 @@ public struct OrphanScanner: Sendable {
         let lowered = bundleID.lowercased()
         if Self.deniedNames.contains(lowered) { return false }
         for prefix in Self.deniedPrefixes where lowered.hasPrefix(prefix) { return false }
-        return !installed.contains(lowered)
+        // `<bundleID>.<sufiks>` (np. `com.app.helper.plist`) należy do zainstalowanej aplikacji.
+        return !installed.contains(lowered) && !installed.contains { lowered.hasPrefix($0 + ".") }
     }
 
     private func isOldEnough(_ url: URL) -> Bool {

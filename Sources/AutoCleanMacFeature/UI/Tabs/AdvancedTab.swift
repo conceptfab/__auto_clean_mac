@@ -33,7 +33,7 @@ public struct AdvancedTab: View {
             }
 
             Section {
-                ForEach(DeleteMode.allCasesOrdered, id: \.self) { mode in
+                ForEach(SafeDeleter.Mode.allCasesOrdered, id: \.self) { mode in
                     DeleteModeRow(
                         mode: mode,
                         selected: model.deleteMode == mode,

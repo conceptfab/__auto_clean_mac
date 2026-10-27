@@ -41,6 +41,31 @@ final class TasksTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: trash.appendingPathComponent("fresh.txt").path))
     }
 
+    /// Regresja: w trybie trash `trashItem` na elemencie z Kosza nic nie zwalnia — ma być usunięcie trwałe.
+    func test_trash_mode_permanently_deletes_old_trash_items_and_dry_run_keeps_them() async throws {
+        let trash = tempDir.appendingPathComponent(".Trash")
+        let old = trash.appendingPathComponent("old.txt")
+        let task = TrashTask(isEnabled: true, trashedDate: { _ in Date().addingTimeInterval(-30 * 86_400) })
+        let logsDir = tempDir.appendingPathComponent("trash-logs")
+
+        try Fixtures.makeFile(at: old, size: 100)
+        let dryLogger = try Logger(directory: logsDir.appendingPathComponent("dry"))
+        _ = await task.run(context: CleanupContext(retentionDays: 7, deleter: SafeDeleter(mode: .dryRun, logger: dryLogger),
+                                                   logger: dryLogger, homeDirectory: tempDir))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: old.path))
+
+        let trashLogger = try Logger(directory: logsDir.appendingPathComponent("trash"))
+        let result = await task.run(context: CleanupContext(retentionDays: 7, deleter: SafeDeleter(mode: .trash, logger: trashLogger),
+                                                            logger: trashLogger, homeDirectory: tempDir))
+        XCTAssertEqual(result.bytesFreed, 100)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: old.path))
+        // Bez poprawki element zniknąłby z fałszywego Kosza przez `trashItem` (do prawdziwego ~/.Trash).
+        let log = try FileManager.default.contentsOfDirectory(at: logsDir.appendingPathComponent("trash"), includingPropertiesForKeys: nil)
+            .map { try String(contentsOf: $0, encoding: .utf8) }.joined()
+        XCTAssertTrue(log.contains("\tdelete\titems=1 path="), log)
+        XCTAssertFalse(log.contains("\ttrash\t"), log)
+    }
+
     /// Regresja: plik edytowany dawno temu, ale wrzucony do Kosza dziś, nie może zniknąć.
     func test_trash_keeps_recently_trashed_item_with_old_content_mtime() async throws {
         let trash = tempDir.appendingPathComponent(".Trash")
@@ -263,7 +288,6 @@ final class TasksTests: XCTestCase {
         let context = CleanupContext(
             retentionDays: 7,
             deleter: SafeDeleter(mode: .dryRun, logger: logger),
-            deletionMode: .dryRun,
             logger: logger,
             homeDirectory: tempDir
         )
@@ -289,7 +313,6 @@ final class TasksTests: XCTestCase {
         let context = CleanupContext(
             retentionDays: 7,
             deleter: SafeDeleter(mode: .trash, logger: logger),
-            deletionMode: .trash,
             logger: logger,
             homeDirectory: tempDir
         )
@@ -315,7 +338,6 @@ final class TasksTests: XCTestCase {
         let context = CleanupContext(
             retentionDays: 7,
             deleter: SafeDeleter(mode: .live, logger: logger),
-            deletionMode: .live,
             logger: logger,
             homeDirectory: tempDir
         )
@@ -345,7 +367,6 @@ final class TasksTests: XCTestCase {
         let context = CleanupContext(
             retentionDays: 7,
             deleter: SafeDeleter(mode: .dryRun, logger: logger),
-            deletionMode: .dryRun,
             logger: logger,
             homeDirectory: tempDir
         )
@@ -374,7 +395,6 @@ final class TasksTests: XCTestCase {
         let context = CleanupContext(
             retentionDays: 7,
             deleter: SafeDeleter(mode: .trash, logger: logger),
-            deletionMode: .trash,
             logger: logger,
             homeDirectory: tempDir
         )

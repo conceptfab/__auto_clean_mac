@@ -14,8 +14,17 @@ public final class SafeDeleter: Sendable {
     public enum Mode: Sendable {
         case live, dryRun, trash
 
-        /// Canonical log/serialization string.
-        /// Must stay in sync with `DeleteMode.jsonValue`.
+        /// Inverse of `label` — parses `delete_mode` from config JSON.
+        public static func parse(_ raw: String) -> Mode? {
+            switch raw {
+            case "trash":    return .trash
+            case "live":     return .live
+            case "dry_run":  return .dryRun
+            default:         return nil
+            }
+        }
+
+        /// Canonical log/serialization string. Inverse of `parse(_:)`.
         public var label: String {
             switch self {
             case .live:   return "live"
@@ -57,25 +66,26 @@ public final class SafeDeleter: Sendable {
         self.logger = logger
     }
 
+    /// Jak `deleteMeasured(_:withinRoot:)`, ale odmawia usunięcia ścieżki wykluczonej — także
+    /// katalogu, który zawiera wykluczenie (usunięcie rekurencyjne zabrałoby je razem z nim).
     @discardableResult
-    public func delete(_ path: URL, withinRoot: URL) throws -> Int64 {
-        try deleteMeasured(path, withinRoot: withinRoot).bytesFreed
+    public func deleteMeasured(_ path: URL, withinRoot: URL, excluding excludedPaths: [URL]) throws -> DeletionMetrics {
+        if excludedPaths.contains(where: { path.isWithin($0) || $0.isWithin(path) }) {
+            throw DeletionError.excludedPath(path: path.path)
+        }
+        return try deleteMeasured(path, withinRoot: withinRoot)
     }
 
     @discardableResult
     public func deleteMeasured(_ path: URL, withinRoot: URL) throws -> DeletionMetrics {
-        let resolvedPath = path.resolvingSymlinksInPath().standardizedFileURL
-        let resolvedRoot = withinRoot.resolvingSymlinksInPath().standardizedFileURL
-
-        let rootStr = resolvedRoot.path
-        let pathStr = resolvedPath.path
-        let rootWithSep = rootStr.hasSuffix("/") ? rootStr : rootStr + "/"
+        let rootStr = withinRoot.resolvingSymlinksInPath().standardizedFileURL.path
+        let pathStr = path.resolvingSymlinksInPath().standardizedFileURL.path
 
         // Usuwać wolno tylko elementy WEWNĄTRZ korzenia — nigdy sam korzeń.
         guard pathStr != rootStr, pathStr != "/" else {
             throw DeletionError.refusedRoot(path: pathStr)
         }
-        guard pathStr.hasPrefix(rootWithSep) else {
+        guard path.isWithin(withinRoot) else {
             throw DeletionError.outsideAllowedRoot(path: pathStr, root: rootStr)
         }
 
@@ -159,8 +169,8 @@ public extension URL {
     /// boundaries (so `…/Foo-Backup` does NOT count as within `…/Foo`).
     ///
     /// Both URLs are resolved (`resolvingSymlinksInPath().standardizedFileURL`) before
-    /// comparison, so callers need not pre-normalize. This mirrors the boundary guard in
-    /// `SafeDeleter.deleteMeasured`.
+    /// comparison, so callers need not pre-normalize. `SafeDeleter.deleteMeasured` uses it as
+    /// its boundary guard.
     func isWithin(_ root: URL) -> Bool {
         let rootStr = root.resolvingSymlinksInPath().standardizedFileURL.path
         let selfStr = self.resolvingSymlinksInPath().standardizedFileURL.path
@@ -170,9 +180,7 @@ public extension URL {
 
     /// Jak `isWithin`, ale sam `root` NIE się liczy — tylko ścisli potomkowie.
     func isStrictlyWithin(_ root: URL) -> Bool {
-        let rootStr = root.resolvingSymlinksInPath().standardizedFileURL.path
-        let selfStr = self.resolvingSymlinksInPath().standardizedFileURL.path
-        let rootWithSep = rootStr.hasSuffix("/") ? rootStr : rootStr + "/"
-        return selfStr != rootStr && selfStr.hasPrefix(rootWithSep)
+        isWithin(root)
+            && self.resolvingSymlinksInPath().standardizedFileURL.path != root.resolvingSymlinksInPath().standardizedFileURL.path
     }
 }

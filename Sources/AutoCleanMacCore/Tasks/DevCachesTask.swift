@@ -71,8 +71,8 @@ public struct DevCachesTask: CleanupTask {
         }
 
         if runBrew, let brew = brewExecutable() {
-            guard context.deletionMode == .live, context.deleter.mode == .live else {
-                let mode = Self.deletionModeLabel(context.deletionMode)
+            guard context.deleter.mode == .live else {
+                let mode = context.deleter.mode.label
                 context.logger.log(event: "brew_cleanup_skip", fields: [
                     "path": brew,
                     "mode": mode,
@@ -122,8 +122,8 @@ public struct DevCachesTask: CleanupTask {
     }
 
     private func runNativeToolCleanups(context: CleanupContext, warnings: inout [String]) {
-        let mode = Self.deletionModeLabel(context.deletionMode)
-        guard context.deletionMode == .live, context.deleter.mode == .live else {
+        let mode = context.deleter.mode.label
+        guard context.deleter.mode == .live else {
             context.logger.log(event: "dev_tool_cleanup_skip", fields: [
                 "mode": mode,
                 "reason": "mode_not_live",
@@ -166,10 +166,6 @@ public struct DevCachesTask: CleanupTask {
                 warnings.append("\(command.label) exited \(outcome.status)")
             }
         }
-    }
-
-    private static func deletionModeLabel(_ mode: SafeDeleter.Mode) -> String {
-        mode.label
     }
 
     private static func findExecutable(_ name: String) -> String? {

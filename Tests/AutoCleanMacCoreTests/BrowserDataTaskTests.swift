@@ -274,7 +274,6 @@ final class BrowserDataTaskTests: XCTestCase {
             let ctx = CleanupContext(
                 retentionDays: 7,
                 deleter: SafeDeleter(mode: mode, logger: logger),
-                deletionMode: mode,
                 logger: logger,
                 homeDirectory: tempDir
             )

@@ -27,7 +27,7 @@ public struct UninstallOutcome: Sendable {
 /// Observable model trzymający EDYTOWALNE preferencje.
 public final class SettingsModel: ObservableObject {
     @Published var retentionDays: Int
-    @Published var deleteMode: DeleteMode
+    @Published var deleteMode: SafeDeleter.Mode
     @Published var reminder: Config.Reminder
     @Published var launchAtLogin: Bool
     @Published public var statistics: AppStatistics
@@ -107,7 +107,7 @@ public final class SettingsModel: ObservableObject {
     func removeSelectedOrphans() async {
         let chosen = orphans.filter { selectedOrphans.contains($0.id) }
         guard !chosen.isEmpty else { return }
-        _ = await onRemoveOrphans(chosen, deleteMode.safeDeleterMode)
+        _ = await onRemoveOrphans(chosen, deleteMode)
         await scanOrphans()
     }
 

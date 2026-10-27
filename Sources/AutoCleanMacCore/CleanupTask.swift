@@ -25,7 +25,6 @@ public struct TaskResult: Equatable, Sendable {
 public struct CleanupContext {
     public let retentionDays: Int
     public let deleter: SafeDeleter
-    public let deletionMode: SafeDeleter.Mode
     public let logger: Logger
     public let fileManager: FileManager
     public let homeDirectory: URL
@@ -34,7 +33,6 @@ public struct CleanupContext {
     public init(
         retentionDays: Int,
         deleter: SafeDeleter,
-        deletionMode: SafeDeleter.Mode = .live,
         logger: Logger,
         fileManager: FileManager = .default,
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -44,7 +42,6 @@ public struct CleanupContext {
         // taski widzą wartość z bezpiecznego przedziału.
         self.retentionDays = min(max(retentionDays, Config.retentionDaysRange.lowerBound), Config.retentionDaysRange.upperBound)
         self.deleter = deleter
-        self.deletionMode = deletionMode
         self.logger = logger
         self.fileManager = fileManager
         self.homeDirectory = homeDirectory
@@ -52,23 +49,12 @@ public struct CleanupContext {
     }
 
     public func isExcluded(_ url: URL) -> Bool {
-        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
-        return excludedPaths.contains { excluded in
-            let root = excluded.path
-            let rootWithSep = root.hasSuffix("/") ? root : root + "/"
-            return path == root || path.hasPrefix(rootWithSep)
-        }
+        excludedPaths.contains { url.isWithin($0) }
     }
 
     @discardableResult
     public func deleteMeasured(_ url: URL, withinRoot root: URL) throws -> SafeDeleter.DeletionMetrics {
-        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
-        let prefix = path.hasSuffix("/") ? path : path + "/"
-        // A recursive removal must also preserve exclusions inside the target directory.
-        if isExcluded(url) || excludedPaths.contains(where: { $0.path.hasPrefix(prefix) }) {
-            throw SafeDeleter.DeletionError.excludedPath(path: url.path)
-        }
-        return try deleter.deleteMeasured(url, withinRoot: root)
+        try deleter.deleteMeasured(url, withinRoot: root, excluding: excludedPaths)
     }
 }
 

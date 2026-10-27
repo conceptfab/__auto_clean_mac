@@ -235,6 +235,15 @@ final class AutoCleanControllerTests: XCTestCase {
         XCTAssertTrue(script.contains("quoted form of \"/Applications/Some \\\"App\\\".app\""))
     }
 
+    func test_adminRemoveScript_boots_out_system_services_before_rm() {
+        let daemon = ElevatedUninstall.adminRemoveScript(for: URL(fileURLWithPath: "/Library/LaunchDaemons/com.example.d.plist"))
+        XCTAssertEqual(daemon, #"do shell script "launchctl bootout system " & quoted form of "/Library/LaunchDaemons/com.example.d.plist" & " 2>/dev/null; " & "rm -rf " & quoted form of "/Library/LaunchDaemons/com.example.d.plist" with administrator privileges"#)
+        XCTAssertTrue(ElevatedUninstall.adminRemoveScript(for: URL(fileURLWithPath: "/Library/LaunchAgents/com.example.a.plist"))
+            .contains("launchctl bootout system"))
+        XCTAssertFalse(ElevatedUninstall.adminRemoveScript(for: URL(fileURLWithPath: "/Library/Application Support/com.example"))
+            .contains("launchctl"))
+    }
+
     func test_failed_finder_trash_does_not_retry_with_permanent_removal() async {
         var scripts: [String] = []
         do {

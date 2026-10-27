@@ -1,39 +1,5 @@
 import Foundation
 
-public enum DeleteMode: String, Equatable {
-    case trash
-    case live
-    case dryRun
-
-    public static func parse(_ raw: String) -> DeleteMode? {
-        switch raw {
-        case "trash":    return .trash
-        case "live":     return .live
-        case "dry_run":  return .dryRun
-        default:         return nil
-        }
-    }
-
-    /// Runtime deletion mode used by `SafeDeleter`.
-    public var safeDeleterMode: SafeDeleter.Mode {
-        switch self {
-        case .trash:  return .trash
-        case .live:   return .live
-        case .dryRun: return .dryRun
-        }
-    }
-
-    /// Canonical JSON/log string. Inverse of `parse(_:)`.
-    /// Must stay in sync with `SafeDeleter.Mode.label`.
-    public var jsonValue: String {
-        switch self {
-        case .trash:  return "trash"
-        case .live:   return "live"
-        case .dryRun: return "dry_run"
-        }
-    }
-}
-
 public enum ReminderMode: String, Equatable {
     case off
     case remind
@@ -124,7 +90,7 @@ public struct Config: Equatable {
     public var window: Window
     public var tasks: Tasks
     public var browsers: [BrowserIdentity: BrowserPreferences]
-    public var deleteMode: DeleteMode
+    public var deleteMode: SafeDeleter.Mode
     public var reminder: Reminder
     public var excludedPaths: [String]
     public var whitelistedCacheApps: [String]
@@ -204,10 +170,10 @@ public struct Config: Equatable {
         }
         config.browsers = browsers
         if let raw = json["delete_mode"] as? String {
-            if let mode = DeleteMode.parse(raw) {
+            if let mode = SafeDeleter.Mode.parse(raw) {
                 config.deleteMode = mode
             } else {
-                warn("Nieznana wartość delete_mode: \"\(raw)\" — używam wartości domyślnej (\(config.deleteMode.rawValue))")
+                warn("Nieznana wartość delete_mode: \"\(raw)\" — używam wartości domyślnej (\(config.deleteMode.label))")
             }
         }
         if let reminderJson = json["reminder"] as? [String: Any] {

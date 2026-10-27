@@ -19,10 +19,9 @@ final class SpyLaunchAgentClient: LaunchAgentClient, @unchecked Sendable {
 }
 
 final class SpyAppTerminator: AppTerminator, @unchecked Sendable {
-    struct Call: Equatable { let bundleID: String; let executableName: String? }
-    var calls: [Call] = []
-    func terminate(bundleID: String, executableName: String?) async -> Bool {
-        calls.append(Call(bundleID: bundleID, executableName: executableName))
+    var calls: [String] = []
+    func terminate(bundleID: String) async -> Bool {
+        calls.append(bundleID)
         return true
     }
 }
@@ -47,6 +46,14 @@ final class SpyLaunchServicesClient: LaunchServicesClient, @unchecked Sendable {
 }
 
 final class AppPurgerTests: XCTestCase {
+    func test_shell_launch_agent_client_reports_failed_bootout() throws {
+        // Nieistniejący plist — `launchctl bootout` kończy się błędem i niczego nie wyładowuje.
+        let temp = try Fixtures.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: temp) }
+        let missing = temp.appendingPathComponent("com.example.missing.plist")
+        XCTAssertFalse(ShellLaunchAgentClient().unload(plist: missing, domain: .userGUI(uid: getuid())))
+    }
+
     func test_cancelled_app_removal_preserves_user_and_system_data() async throws {
         try XCTSkipIf(getuid() == 0, "root bypasses directory permissions")
         let fm = FileManager.default
@@ -66,11 +73,12 @@ final class AppPurgerTests: XCTestCase {
         let logger = try Logger(directory: temp.appendingPathComponent("logs"))
         let prefs = SpyPreferencesDaemon()
         let agents = SpyLaunchAgentClient()
+        let loginItems = SpyLoginItemsClient()
         let elevated = expectation(description: "Administrator removal was cancelled")
         elevated.assertForOverFulfill = true
         let outcome = await AppPurger(
             deleter: SafeDeleter(mode: .live, logger: logger), prefsDaemon: prefs,
-            launchAgents: agents, terminator: SpyAppTerminator(), loginItems: SpyLoginItemsClient(),
+            launchAgents: agents, terminator: SpyAppTerminator(), loginItems: loginItems,
             launchServices: SpyLaunchServicesClient(), elevatedRemove: { _ in
                 elevated.fulfill()
                 throw NSError(domain: "UserCancelled", code: -128)
@@ -85,6 +93,31 @@ final class AppPurgerTests: XCTestCase {
         for path in paths { XCTAssertTrue(fm.fileExists(atPath: path.path), path.path) }
         XCTAssertTrue(prefs.calls.isEmpty)
         XCTAssertTrue(agents.calls.isEmpty)
+        XCTAssertTrue(loginItems.calls.isEmpty, "Login Item usunięty mimo anulowania")
+    }
+
+    func test_purge_keeps_excluded_userside_leftover() async throws {
+        let fm = FileManager.default
+        let temp = try Fixtures.makeTempDir()
+        defer { try? fm.removeItem(at: temp) }
+        let app = temp.appendingPathComponent("Applications/Tiny.app")
+        try fm.createDirectory(at: app, withIntermediateDirectories: true)
+        let excluded = temp.appendingPathComponent("Library/Application Support/com.example.Tiny/keep.db")
+        let removable = temp.appendingPathComponent("Library/Preferences/com.example.Tiny.plist")
+        try Fixtures.makeFile(at: excluded, size: 10)
+        try Fixtures.makeFile(at: removable, size: 10)
+        let logger = try Logger(directory: temp.appendingPathComponent("logs"))
+        let outcome = await AppPurger(
+            deleter: SafeDeleter(mode: .live, logger: logger), prefsDaemon: SpyPreferencesDaemon(),
+            launchAgents: SpyLaunchAgentClient(), terminator: SpyAppTerminator(), loginItems: SpyLoginItemsClient(),
+            launchServices: SpyLaunchServicesClient(), elevatedRemove: { _ in XCTFail("unexpected elevation") },
+            excludedPaths: [excluded], logger: logger
+        ).purge(bundleID: "com.example.Tiny", displayName: nil, appURL: app,
+                homeDirectory: temp, systemRoot: temp, includeSystemPaths: false)
+
+        XCTAssertTrue(outcome.appRemoved)
+        XCTAssertTrue(fm.fileExists(atPath: excluded.path), "wykluczony plik usunięty razem z katalogiem")
+        XCTAssertFalse(fm.fileExists(atPath: removable.path))
     }
 
     func test_dryRun_preserves_loaded_user_and_system_services() async throws {
@@ -321,7 +354,7 @@ final class AppPurgerTests: XCTestCase {
             includeSystemPaths: false
         )
 
-        XCTAssertEqual(terminator.calls, [SpyAppTerminator.Call(bundleID: "com.example.Tiny", executableName: nil)])
+        XCTAssertEqual(terminator.calls, ["com.example.Tiny"])
     }
 
     func test_purge_dryRun_skips_terminator() async throws {
@@ -494,15 +527,17 @@ final class AppPurgerTests: XCTestCase {
         final class RecordingTerminator: AppTerminator, @unchecked Sendable {
             let r: OrderRecorder
             init(_ r: OrderRecorder) { self.r = r }
-            func terminate(bundleID: String, executableName: String?) async -> Bool {
+            func terminate(bundleID: String) async -> Bool {
                 r.record("terminate"); return true
             }
         }
         final class RecordingLoginItems: LoginItemsClient, @unchecked Sendable {
             let r: OrderRecorder
-            init(_ r: OrderRecorder) { self.r = r }
+            let appURL: URL
+            init(_ r: OrderRecorder, appURL: URL) { self.r = r; self.appURL = appURL }
             func removeLoginItem(appName: String?, bundleID: String) {
-                r.record("loginItems")
+                // Login Item wolno zdjąć dopiero, gdy bundle już zniknął (po punkcie przerwania).
+                r.record(FileManager.default.fileExists(atPath: appURL.path) ? "loginItems(app present)" : "loginItems")
             }
         }
         final class RecordingLaunchServices: LaunchServicesClient, @unchecked Sendable {
@@ -518,7 +553,7 @@ final class AppPurgerTests: XCTestCase {
             prefsDaemon: SpyPreferencesDaemon(),
             launchAgents: SpyLaunchAgentClient(),
             terminator: RecordingTerminator(recorder),
-            loginItems: RecordingLoginItems(recorder),
+            loginItems: RecordingLoginItems(recorder, appURL: appURL),
             launchServices: RecordingLaunchServices(recorder),
             elevatedRemove: { _ in },
             logger: logger
@@ -531,10 +566,10 @@ final class AppPurgerTests: XCTestCase {
             includeSystemPaths: false
         )
 
-        // We do not assert on what comes after `unregister` — the deleter itself is
-        // not on the recorder. The key invariant is the prefix.
+        // The deleter itself is not on the recorder; `loginItems` records whether the
+        // bundle was already gone, i.e. whether it ran after the abort point.
         let events = recorder.snapshot()
-        XCTAssertEqual(Array(events.prefix(3)), ["terminate", "loginItems", "unregister"])
+        XCTAssertEqual(events, ["terminate", "unregister", "loginItems"])
         XCTAssertFalse(events.contains("rebuild"), "rebuild() is a batch concern, not per-app")
     }
 

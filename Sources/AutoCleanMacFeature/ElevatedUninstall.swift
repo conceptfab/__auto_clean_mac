@@ -42,10 +42,16 @@ enum ElevatedUninstall {
     }
 
     /// AppleScript usuwający element z autoryzacją administratora: macOS pokazuje własne okno
-    /// hasła (nigdy `sudo` w tle).
+    /// hasła (nigdy `sudo` w tle). Systemowy LaunchDaemon/Agent najpierw wyładowujemy jako root
+    /// (z konta użytkownika `bootout system` zawsze się nie udaje); błąd bootout nie blokuje `rm`.
     static func adminRemoveScript(for url: URL) -> String {
         let escaped = escapeForAppleScript(url.path)
-        return "do shell script \"rm -rf \" & quoted form of \"\(escaped)\" with administrator privileges"
+        let isSystemService = ["/Library/LaunchDaemons", "/Library/LaunchAgents"]
+            .contains { url.isStrictlyWithin(URL(fileURLWithPath: $0)) }
+        let bootout = isSystemService
+            ? "\"launchctl bootout system \" & quoted form of \"\(escaped)\" & \" 2>/dev/null; \" & "
+            : ""
+        return "do shell script \(bootout)\"rm -rf \" & quoted form of \"\(escaped)\" with administrator privileges"
     }
 
     private static func escapeForAppleScript(_ s: String) -> String {
